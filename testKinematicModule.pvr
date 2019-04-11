@@ -1,0 +1,205 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Scene base_name="testGear" name_space="Scene" name_suffix="0" persistency="666">
+  <Objects>
+    <Object base_name="Root" name_space="__global__" name_suffix="0" persistency="666" pickable="0" type="Object" visible="4294967295">
+      <Object ambient="0.3 0.3 0.3 1" base_name="light" beacon="Headlight_beacon" diffuse="1 1 1 1" lightType="point" name_space="__global__" name_suffix="0" on="1" persistency="666" photometricMap="" pickable="0" shadow="0" shadowColor="0.1 0.1 0.1 1" shadowMapRes="2048" shadowVolume="1e+06 1e+06 1e+06 -1e+06 -1e+06 -1e+06 1" specular="0.1 0.1 0.1 1" type="Light" visible="4294967295">
+        <Object accept_root="1" aspect="1" at="-0.491972 5.01299 -0.228731" at_dir="0" base_name="Default" far="512" fov="1.0472" from="6.20118 4.88231 17.7652" name_space="__global__" name_suffix="0" near="0.1" orthoSize="100" persistency="666" pickable="0" scale="1 1 1" type="Camera" up="0 1 0" visible="4294967295">
+          <Object at="0 0 -1" at_dir="0" base_name="Headlight_beacon" from="0 0 0" light="light" name_space="__global__" name_suffix="0" persistency="666" pickable="0" scale="1 1 1" type="LightBeacon" up="0 1 0" visible="4294967295">
+            <constraint persistency="666"/>
+          </Object>
+          <constraint persistency="666"/>
+        </Object>
+      </Object>
+    </Object>
+  </Objects>
+  <Cameras activeCam="Default" persistency="666"/>
+  <Rendering deferred_rendering="0" fogColor="0.5 0.5 0.5 1" fogParams="0 0 100 0.1" frustum_culling="1" fxaa="0" hmdd="0" marker="0" occlusion_culling="0" persistency="666" ssao="0" ssao_kernel="4" ssao_noise="4" ssao_radius="0.02" two_sided="1"/>
+  <Scripts persistency="666">
+    <Script base_name="constructJointModels" group="no group" name_space="__script__" name_suffix="0" persistency="666" server="server1" type="Python">
+      <core>
+	import VR
+	
+	VR.setPhysicsActive(0)
+	VR.scene.clearChildren()
+	kin = VR.kinematics
+	kin.clear()
+
+	def addPrimitive(name, parent, params, pose):
+		p = VR.Geometry(name)
+		p.setPrimitive(params)
+		p.setPose(pose)
+		parent.addChild(p)
+		return p
+		
+	def addCSG(name, obj1, obj2, operation):
+		csg = VR.CSGGeometry(name)
+		csg.addChild(obj1)
+		csg.addChild(obj2)
+		csg.setOperation(operation)
+		csg.setEditMode(0)
+		csg.setPickable(True)
+		VR.scene.addChild(csg)
+		return csg
+		
+	# - build all cases
+	#  - 6DoF joints 
+	#   - fixed joint X
+	#   - ball joint X
+	#   - hinge joint X
+	#   - linear joint
+	#  - mechanics
+	#   - gear gear X
+	#   - gear axle (fixed constraint)
+	#   - gear chain 
+	#   - gear thread
+	#  - long chains
+	#  - closed chain
+	#  - graph with cylces
+		
+	length = 2.4
+	d1 = VR.Pose([0,-length/2,0],[0,0,-1],[0,1,0])
+	d2 = VR.Pose([0,length/2,0],[0,0,-1],[0,1,0])
+	
+	#hinge joint
+	h1 = addPrimitive('cylinder', VR.scene, 'Cylinder '+ str(length)+' 0.25 32 1 1 1', VR.Pose([length,2.5,0],[0,0,-1],[1,0,0]))
+	h2 = addPrimitive('cylinder', VR.scene, 'Cylinder '+ str(length)+' 0.2 32 1 1 1', VR.Pose([0,2.5,0],[0,0,-1],[1,0,0]))
+	h1.setPickable(True)
+	h2.setPickable(True)
+	
+	hinge = kin.addHinge(kin.addBody(h1, False), kin.addBody(h2), d1, d2, 5, -0.3, 0.7)
+
+	#ball joint
+	b1 = addPrimitive('sphere', VR.scene, 'Sphere 0.7 3', VR.Pose([0,0,0],[0,0,-1],[0,1,0]))
+	b2 = addPrimitive('box', VR.scene, 'Box 1.4 1.4 1.4', VR.Pose([0.7,0,0],[0,0,-1],[0,1,0]))
+	csg1 = addCSG('b1', b1, b2, 'subtract')
+	
+	b3 = addPrimitive('cylinder', VR.scene, 'Cylinder '+ str(length)+' 0.25 32 1 1 1', VR.Pose([-1.4,0,0],[0,0,-1],[1,0,0]))
+	csg2 = addCSG('ballJoint', csg1, b3, 'unite')
+	
+	b4 = addPrimitive('sphere', VR.scene, 'Sphere 0.5 3', VR.Pose([0,0,0],[0,0,-1],[0,1,0]))
+	b5 = addPrimitive('cylinder', VR.scene, 'Cylinder '+ str(length)+' 0.25 32 1 1 1', VR.Pose([1.4,0,0],[0,0,-1],[1,0,0]))
+	csg3 = addCSG('b2', b4, b5, 'unite')
+	
+	csg2.setFrom([1.4,0,2.5])
+	csg3.setFrom([1.4,0,2.5])
+
+	b6 = kin.addBallJoint(kin.addBody(csg2), kin.addBody(csg3), VR.Pose([0,0,0],[0,0,-1],[0,1,0]), VR.Pose([0,0,0],[0,0,-1],[0,1,0]))
+	
+	#fixed joint
+	f1 = addPrimitive('cylinder', VR.scene, 'Cylinder '+ str(length)+' 0.25 32 1 1 1', VR.Pose([length,2.5,2.5],[0,0,-1],[1,0,0]))
+	f2 = addPrimitive('cylinder', VR.scene, 'Cylinder '+ str(length)+' 0.2 32 1 1 1', VR.Pose([0,2.5,2.5],[0,0,-1],[1,0,0]))
+	f1.setPickable(True)
+	f2.setPickable(True)
+	
+	fixed = kin.addFixedJoint(kin.addBody(f1), kin.addBody(f2), d1, d2)	
+	
+	#linear joint
+	l1 = addPrimitive('cylinder', VR.scene, 'Cylinder '+ str(length)+' 0.25 32 1 1 1', VR.Pose([length,0,0],[0,0,-1],[1,0,0]))
+	l2 = addPrimitive('cylinder', VR.scene, 'Cylinder '+ str(length)+' 0.2 32 1 1 1', VR.Pose([0,0,0],[0,0,-1],[1,0,0]))
+	l1.setPickable(True)
+	l2.setPickable(True)
+	
+	linear = kin.addHinge(kin.addBody(l1, False), kin.addBody(l2), d1, d2, 1, -0.3, 1)
+	
+		
+	# gear axle
+	p1 = VR.Pose([length/2,0,-2.5],[-1,0,0],[0,1,0])
+	p2 = VR.Pose([length/2,0,-2.5],[-1,0,0],[0,1,0])
+	g1 = addPrimitive('gear', VR.scene, 'Gear 0.1 0.2 0.1 32 0.05 0', VR.Pose([length/2,0,-2.5],[-1,0,0],[0,1,0]))
+	g2 = addPrimitive('cylinder', VR.scene, 'Cylinder '+ str(length*2)+' 0.2 32 1 1 1', VR.Pose([length/2,0,-2.5],[0,0,-1],[1,0,0]))
+
+	gearAxle = kin.addFixedJoint(kin.addBody(g1), kin.addBody(g2), p1, p2)
+	g1.setPickable(True)
+	g2.setPickable(True)
+	
+
+	#gear gear
+	gg1 = addPrimitive('gear', VR.scene, 'Gear 0.1 0.3 0.1 32 0.05 0', VR.Pose([length/2-0.5,2.5,-2.5],[0,0,-1],[0,1,0]))
+	gg2 = addPrimitive('gear', VR.scene, 'Gear 0.1 0.3 0.1 32 0.05 0', VR.Pose([length/2+0.5,2.5,-2.5],[0,0,-1],[0,1,0]))
+	
+	gg1.getConstraint().lock([0,1,2,3,4])
+	gg2.getConstraint().lock([0,1,2,3,4])
+
+	g = kin.getGraph()
+	print "Nodes: ", g.getNodes()
+	print "Edges: ", g.getEdges()
+
+	VR.setPhysicsActive(1)
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+</core>
+    </Script>
+    <Script base_name="constructKinChainModel" group="no group" name_space="__script__" name_suffix="0" persistency="666" server="server1" type="Python">
+      <core>
+	import VR
+	
+		
+	VR.setPhysicsActive(0)
+	VR.scene.clearChildren()
+	VR.kinematics.clear()
+	
+	def addPrimitive(name, parent, params, pose, pickable, dynamic):
+		p = VR.Geometry(name)
+		p.setPrimitive(params)
+		p.setPose(pose)
+		parent.addChild(p)
+		p.setPickable(pickable)
+		return VR.kinematics.addBody(p, dynamic)
+	
+	length = 2.4
+	#hinge joints
+	t1 = addPrimitive('cylinder', VR.scene, 'Cylinder '+ str(length)+' 0.25 32 1 1 1', VR.Pose([length,0,0],[0,0,-1],[1,0,0]), True, False)
+	t2 = addPrimitive('cylinder', VR.scene, 'Cylinder '+ str(length)+' 0.2 32 1 1 1', VR.Pose([0,0,0],[0,0,-1],[1,0,0]), True, True)
+	t3 = addPrimitive('cylinder', VR.scene, 'Cylinder '+ str(length)+' 0.25 32 1 1 1', VR.Pose([0-length,0,0],[0,0,-1],[1,0,0]), True, True)
+	t4 = addPrimitive('cylinder', VR.scene, 'Cylinder '+ str(length)+' 0.2 32 1 1 1', VR.Pose([0-2*length,0,0],[0,0,-1],[1,0,0]), True, True)
+	
+	d1 = VR.Pose([0,-length/2,0],[0,0,-1],[0,1,0])
+	d2 = VR.Pose([0,length/2,0],[0,0,-1],[0,1,0])
+	
+	b1 = VR.kinematics.addBallJoint(t1, t2, d1, d2)
+	#b2 = VR.kinematics.addBallJoint(t2, t3, d1, d2)
+	f1 = VR.kinematics.addFixedJoint(t2, t3, d1, d2)
+	h1 = VR.kinematics.addHinge(t3, t4, d1, d2, 5, 0.0, 0.7)
+
+	g = VR.kinematics.getGraph()
+	print "Nodes: ", g.getNodes()
+	print "Edges: ", g.getEdges()
+
+	VR.setPhysicsActive(1)
+
+	
+	
+</core>
+    </Script>
+    <Script base_name="init" group="no group" name_space="__script__" name_suffix="0" persistency="666" server="server1" type="Python">
+      <core>
+	import VR
+
+	if hasattr(VR, 'scene'): VR.scene.destroy()
+	VR.scene = VR.Object('scene', 'light')
+	
+	VR.kinematics = VR.Kinematics()
+	#VR.constructJointModels()	
+	#VR.constructKinChainModel()
+</core>
+      <trig type="on_scene_load" dev="" state="Pressed" param="" key="0" base_name="trigger" name_space="__global__" name_suffix="3" persistency="666"/>
+    </Script>
+  </Scripts>
+  <Sockets persistency="666"/>
+  <Background color="0.6 0.6 0.6" format=".png" path="" persistency="666" type="0"/>
+  <Navigation active="Orbit" persistency="666"/>
+  <Materials persistency="666"/>
+  <Semantics persistency="666"/>
+</Scene>

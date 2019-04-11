@@ -1,0 +1,3347 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Scene base_name="step-import" name_space="Scene" name_suffix="0" persistency="666">
+  <Objects>
+    <Object base_name="Root" name_space="__global__" name_suffix="0" persistency="666" pickable="0" type="Object" visible="4294967295">
+      <Object ambient="0.3 0.3 0.3 1" base_name="light" beacon="Headlight_beacon" diffuse="1 1 1 1" lightType="point" name_space="__global__" name_suffix="0" on="1" persistency="666" photometricMap="" pickable="0" shadow="0" shadowColor="0.1 0.1 0.1 1" shadowMapRes="2048" shadowVolume="1e+06 1e+06 1e+06 -1e+06 -1e+06 -1e+06 1" specular="0.1 0.1 0.1 1" type="Light" visible="4294967295">
+        <Object accept_root="1" aspect="1" at="0.131174 1.23536 -0.482961" at_dir="0" base_name="Default" far="512" fov="1.0472" from="0.872546 2.21994 -0.124592" name_space="__global__" name_suffix="0" near="0.1" orthoSize="100" persistency="666" pickable="0" scale="1 1 1" type="Camera" up="0 1 0" visible="4294967295">
+          <Object at="0 0 -1" at_dir="0" base_name="Headlight_beacon" from="0 0 0" light="light" name_space="__global__" name_suffix="0" persistency="666" pickable="0" scale="1 1 1" type="LightBeacon" up="0 1 0" visible="4294967295">
+            <constraint persistency="666"/>
+          </Object>
+          <constraint persistency="666"/>
+        </Object>
+      </Object>
+    </Object>
+  </Objects>
+  <Cameras activeCam="Default" persistency="666"/>
+  <Rendering deferred_rendering="0" fogColor="0.5 0.5 0.5 1" fogParams="0 0 100 0.1" frustum_culling="1" fxaa="0" hmdd="0" marker="0" occlusion_culling="0" persistency="666" ssao="0" ssao_kernel="4" ssao_noise="4" ssao_radius="0.02" two_sided="1"/>
+  <Scripts persistency="666">
+    <Script base_name="Component" group="dataFusion" name_space="__script__" name_suffix="0" persistency="666" server="server1" type="Python">
+      <core>
+	import VR
+	from VR.Math import Vec3
+
+	if not hasattr(VR, 'glID'): VR.glID = 0
+	def getGlobalID():
+		VR.glID += 1
+		return VR.glID
+		
+	class Component:
+		def __init__(self):
+			self.vrID = getGlobalID()
+			VR.components[self.vrID] = self
+			self.connections = []
+			self.ports = {}
+			self.egraphID = -1
+			self.pgraphID = -1
+			
+			self.name = ''
+			self.ecadID = ''
+			self.mcadID = ''
+		
+			self.position = Vec3([0,0,0])
+			self.geometry = None
+			self.entity = None
+			self.flag = 0
+		
+			self.setName(name)
+			self.setEcadID(ecadID)
+			self.setMcadID(mcadID)
+			
+		def setCurrent(self, current, port = '0'):
+			if not port in self.ports: return
+			p = self.ports[port]
+			p.entity.set('current', str(current))
+			if not p.ladHWaddr: return
+			for k,v in VR.profinetVariables.items():
+				# TODO: debug stuff
+				if v.name in ['SFT_Estop_Button', 'OS_ExtMot_Overload_Switch']:continue
+				if v.logicalAddress == p.ladHWaddr and not str(v.value) == str(current):
+					print 'set LAD variable:', v.name, '(' + v.logicalAddress + ') '+str(v.value)+' -&gt;', str(current), ' port:', port
+					v.value = str(current)
+					
+		def getWire(self, c2):
+			for c in self.connections:
+				if c.source.ecadID == c2.ecadID: return c
+				if c.target.ecadID == c2.ecadID: return c
+				
+		def getConnection(self, port):
+			if not port in self.ports: return None
+			return self.ports[port].connection
+		
+		def register(self, string):
+			if not string in VR.componentIDs: VR.componentIDs[string] = []  
+			VR.componentIDs[string].append(self)
+		
+		def setName(self, name):	
+			if name:
+				self.name = name
+				self.register(name)
+			
+		def setEcadID(self, ecadID):	
+			if ecadID:
+				self.ecadID = ecadID
+				self.register(ecadID)
+	
+		def setMcadID(self, mcadID):	
+			if mcadID:
+				self.mcadID = mcadID
+				self.register(mcadID)
+		
+		def printData(self):
+			print self.ecadID, self.name, self.connections
+		
+		def __repr__(self):
+			#return 'ecadID: "'+ self.ecadID + '" mcadID: "'+ self.mcadID + '" name:"' + self.name + '"'
+			return 'vrID:' +str(self.vrID)+' ecadID:'+self.ecadID+' mcadID:'+self.mcadID+' name:'+self.name#+' Position:  '+self.position  #+'  Connections: '+str(self.connections)
+
+	return Component()
+</core>
+      <arg type="NoneType" value="None" base_name="name" name_space="Component" name_suffix="0" persistency="666"/>
+      <arg type="NoneType" value="None" base_name="ecadID" name_space="Component" name_suffix="0" persistency="666"/>
+      <arg type="NoneType" value="None" base_name="mcadID" name_space="Component" name_suffix="0" persistency="666"/>
+    </Script>
+    <Script base_name="GUI" group="deprecated" name_space="__script__" name_suffix="0" persistency="666" server="server1" type="Python">
+      <core>
+	import VR
+	
+		
+	
+	m = dev.getMessage()
+	
+	
+	
+	if m == 'import DATA': 
+		VR.importDATA()
+		
+	if m == 'Compute Visualisation':
+		VR.computeViz()
+		
+		
+	
+	if m == 'Get unknown Geometry':
+		s = VR.getUnknownGeom()
+		for ecadID in s:
+			dev.answer(dev.getKey(), ecadID)
+			print ecadID
+		
+		
+	if m == 'Select Geometry':
+		t = VR.click(dev)
+		dev.answer(dev.getKey(), t)
+		
+		
+	if m == 'Get ECAD without Geometry':
+		for vrID, component in VR.components.items():
+			if not 'W' in component.ecadID:
+				if not component.geometry: 
+					without = []
+					without.append(component.ecadID)
+					for i in without:
+						dev.answer(dev.getKey(), i)
+				
+				
+	
+	
+		
+	if len(m.split(',')) == 3: 
+		for i in m.split(','):
+			#tmp = []
+			#tmp.append(int(i))
+			#print i
+			VR.positions.append(float(i))
+			
+	
+	
+	
+	for vrID, component in VR.components.items():
+		if not component.geometry:
+			if m == component.ecadID:
+				b = VR.positions 
+				VR.manualGeometry[m] = b
+				VR.positions = []
+				node = VR.Geometry(m)
+				component.geometry = node
+				node.setPosition(b)
+				component.position = b
+				print VR.manualGeometry
+				#-0#p = [-0.3, 1.64, -0.9]
+				
+				
+			
+	
+	
+	
+	
+	if len(m.split(':')) == 2:
+		tmp = []
+		for i in m.split(':'):
+			tmp.append(i)
+			#print tmp[1] 
+		for vrID, component in VR.components.items():
+			if component.ecadID == tmp[0]:
+				name = tmp[1]
+				c = VR.getRoot().find(name)
+				p = c.getWorldFrom()
+				print c
+				component.geometry = c
+				component.position = p
+
+	#Touch Panel Handler
+	if len(m.split('|')) == 4:
+		print 'got messsage:\n','set ', m.split('|')[2], 'to', m.split('|')[3]
+	
+	if len(m.split('|')) == 2:
+		if m.split('|')[0] == 'start':	print 'starting', 'extruder'
+		else:	print 'stopping', 'extruder'
+	
+	
+	
+		
+</core>
+      <trig type="none" dev="server1" state="Released" param="" key="-1" base_name="trigger" name_space="__global__" name_suffix="7" persistency="666"/>
+    </Script>
+    <Script base_name="GUI_keyboard" group="deprecated" name_space="__script__" name_suffix="0" persistency="666" server="server1" type="Python">
+      <core>
+	import VR
+	
+	k = dev.getKey()
+	
+	if k == 104: 
+		c = VR.find('site')
+		c.setVisible(not c.isVisible())
+</core>
+      <trig type="none" dev="keyboard" state="Pressed" param="" key="-1" base_name="trigger" name_space="__global__" name_suffix="8" persistency="666"/>
+    </Script>
+    <Script base_name="PLCtest" group="tests" name_space="__script__" name_suffix="0" persistency="666" server="server1" type="Python">
+      <core>
+	import VR
+	
+	for n,v in VR.profinetVariables.items():
+		a = v.logicalAddress
+		if a == '': continue
+		print a,'\t', v.value
+	
+	def getPLC():
+		for k,component in VR.components.items():
+			if not component.entity: continue
+			if component.entity.is_a('PLC'): return component
+			
+	def getElectricConnection(c):
+		connections = [ cn for cn in c.connections if cn.cType == 'electric' ]
+		components = []
+		for cn in connections:
+			ID = cn.target.ecadID
+			if ID == c.ecadID: ID = cn.source.ecadID
+			components.append(VR.componentIDs[ID][0])			
+		return zip(connections, components)
+		
+	def printConnection(cn,c,indent):
+		print indent, cn.current, '  ', cn.label, '  ', c.ecadID, '  ', c.name
+		
+			
+	plc = getPLC()
+	print 'PLC', plc
+	for connection, c2 in getElectricConnection(plc):
+		printConnection(connection, c2, ' ')
+		if '-27A0' in c2.ecadID:
+			for connection2, c3 in getElectricConnection(c2):
+				printConnection(connection2, c3, '  ')
+				if '-32A0' in c3.ecadID:
+					for connection3, c4 in getElectricConnection(c3):
+						printConnection(connection3, c4, '   ')
+						if '-60S2' in c4.ecadID:
+							print '      ', connection3
+</core>
+    </Script>
+    <Script base_name="TODOs" group="no group" name_space="__script__" name_suffix="0" persistency="666" server="server1" type="Python">
+      <core>
+	import VR
+
+
+	"""
+	- Fix drive to engine path
+		- Check out in TIA
+		
+	- Kinematics
+		- fix chain gear parameters!
+			- top gear has no teeth, are they important?
+		- add mechanism simulation
+		- add kinematics simulation
+		
+	- Migrate to ontology
+		- populate ports and wires
+		- add all ports, for every connection, evevn if it does not have a specified port!!
+			
+	
+	
+	
+	
+	
+	
+	
+	
+	"""
+</core>
+    </Script>
+    <Script base_name="buildECADgraph" group="dataFusion" name_space="__script__" name_suffix="0" persistency="666" server="server1" type="Python">
+      <core>
+	import VR
+	
+	
+	#print len(VR.components)
+	
+	VR.electricGraph = VR.Graph()
+	VR.profinetGraph = VR.Graph()
+	
+	VR.componentsByGraphID = {}
+	
+	# add all components as graph nodes
+	for vrID, component in VR.components.items():
+		p = VR.Pose()
+		neID = VR.electricGraph.addNode(p)
+		npID = VR.profinetGraph.addNode(p)
+		component.egraphID = neID
+		component.pgraphID = npID
+		VR.componentsByGraphID[neID] = component
+		
+	# add component connections to graph
+	for vrID, component in VR.components.items():
+		for connection in component.connections:
+			cType = connection.cType
+			#print VR.componentIDs[connection.source.ecadID]
+			component1 = VR.componentIDs[connection.source.ecadID][0]
+			component2 = VR.componentIDs[connection.target.ecadID][0]
+			if cType == 'electric': # birectional connection
+				#print 'CONNECT', component1.egraphID, component2.egraphID
+				VR.electricGraph.connect(component1.egraphID, component2.egraphID)
+				VR.electricGraph.connect(component2.egraphID, component1.egraphID)
+			if cType == 'profinet': # birectional connection
+				VR.profinetGraph.connect(component1.pgraphID, component2.pgraphID)
+				VR.profinetGraph.connect(component2.pgraphID, component1.pgraphID)
+			
+	
+	print 'building ECAD Graph completed'
+	
+	
+
+	
+	
+
+	
+	
+	
+</core>
+    </Script>
+    <Script base_name="click" group="no group" name_space="__script__" name_suffix="0" persistency="666" server="server1" type="Python">
+      <core>
+	import VR
+	
+	if not hasattr(VR, 'selector'): VR.selector = VR.Selector()
+	
+	def getComponent(obj):
+		for k,c in VR.components.items():
+			if c.geometry == obj: return c
+		
+	if dev.intersect():
+		i = dev.getIntersected()
+		if not i.getName() == 'site': print dev.getIntersection(), i.getBaseName()
+	
+		VR.selector.select(i)
+		e = i.getEntity()
+		if not e: return
+		
+		if e.is_a('Switch') and 0:
+			mode = e.get('state')
+			if   mode == 'pressed': e.set('state', 'unpressed')
+			elif mode == 'unpressed': e.set('state', 'pressed')
+			print e.getName()
+			
+		if e.is_a('DoublePushbutton'):
+			pComponent = i.getWorldFrom()
+			pClick = dev.getIntersection()
+			dH = pClick[1] - pComponent[1]
+			
+			k = 0
+			if dH &lt; 0: k = 1
+			if   e.get('state',k) == 'pressed': e.set('state', 'unpressed',k)
+			elif e.get('state',k) == 'unpressed': e.set('state', 'pressed',k)
+			
+		VR.simECAD()
+</core>
+      <trig type="on_device" dev="mouse" state="Pressed" param="" key="0" base_name="trigger" name_space="__global__" name_suffix="5" persistency="666"/>
+    </Script>
+    <Script base_name="computeViz" group="no group" name_space="__script__" name_suffix="0" persistency="666" server="server1" type="Python">
+      <core>
+	import VR
+	from VR.Math import Vec3
+
+	if hasattr(VR, 'ecadViz'): VR.ecadViz.destroy()
+	VR.ecadViz = VR.AnalyticGeometry()
+	VR.ecadViz.setLabelParams(0.02, True, True, [0,0,0,1], [1,1,1,1], [-0.03,0,0.01])
+	VR.scene.addChild(VR.ecadViz)
+	
+	if not VR.showViz: return
+	
+	spheres = {}
+	cPositions = {}
+	
+	def drawComponent(component, p):
+		node = VR.Geometry(component.name)
+		node.setPrimitive('Sphere 0.01 2')
+		VR.ecadViz.addChild(node)
+		node.setPosition(p)
+		spheres[component] = node
+		cPositions[component] = Vec3(p)
+		VR.ecadViz.addVector(p, [0,0,0],[0,0,0],component.ecadID,0)
+		return node
+
+	#temporary improvising for start XPWR/'Steckdose'-------------
+	component = VR.componentIDs['=KVE120+-XPWR'][0]
+	node = drawComponent(component, [-0.3, 1.64, -0.9])
+	node.setColor('green')
+	VR.objectsByBaseName[component.ecadID] = node
+
+	#1. initial positioning, make MCAD-ECAD-Geometry visible
+	for vrID, component in VR.components.items():
+		if component.mcadID and component.geometry:	
+			p = component.geometry.getWorldFrom()
+			node = drawComponent(component, p)
+				
+	allVisibleECADcomps = {}
+	
+	def getCPos(component):
+		if component in cPositions: return cPositions[component]
+		return component.position
+		
+	def getClassColor(component):
+		if not component.entity: return 'black'
+		e = component.entity
+		if e.is_a('PLC'): return 'yellow'
+		if e.is_a('FrequencyConverter'): return 'brown'
+		if e.is_a('Fuse'): return 'blue'
+		if e.is_a('Switch'): return 'gray'
+		if e.is_a('AutomationModule'): return 'orange'		
+		return 'red' #others
+
+	#2. add mainPath as anchor for initial positions
+	visualConnections = {} # replace by wire IDs!!
+	
+	def isConnViz(i, j):
+		if i in visualConnections:
+			if j in visualConnections[i]: return True
+		if j in visualConnections:
+			if i in visualConnections[j]: return True
+		return False
+	
+	for K in range(10):
+		N = 0
+		for I,component1 in VR.components.items():
+			for J,component2 in VR.components.items():
+				if component1 == component2: continue
+				if isConnViz(I,J): continue
+				hasRepr1 = bool(component1.geometry) or bool(component1 in spheres)
+				hasRepr2 = bool(component2.geometry) or bool(component2 in spheres)
+				if hasRepr1 and hasRepr2: 
+					mainPath = VR.getRoute(component1.ecadID, component2.ecadID)
+					pathLength = len(mainPath)
+					if pathLength &lt;= 1: continue
+
+					P0 = getCPos(mainPath[ 0])
+					P1 = getCPos(mainPath[-1])
+				
+					if not I in visualConnections: visualConnections[I] = []
+					visualConnections[I].append(J)
+					N += 1
+
+					#set unique position for each ecad component in mainPath
+					for i,part in enumerate(mainPath): 
+						allVisibleECADcomps[part] = part
+						p = P0 + (P1-P0)*(float(i)/(pathLength-1))
+						for vrID, component in VR.components.items():
+							if part.ecadID == component.ecadID:
+								P2 = getCPos(component)
+								if P2.length() &lt; 1e-5:
+									node = drawComponent(component, p)
+									c = getClassColor(component)
+									node.setColor(c)
+				
+					for s in range(pathLength-1): #add subvector for each ecad component within mainPath
+						x = getCPos(mainPath[s])
+						y = getCPos(mainPath[s+1])
+						wire = mainPath[s].getWire(mainPath[s+1])
+						if wire: 
+							current = wire.entity.get('current')
+							c = [1-current,current,0]
+							VR.ecadViz.addVector(x, y-x,c,wire.label,0)
+		if N == 0: break
+
+	# profinet
+	for c, component in allVisibleECADcomps.items():
+		pID = c.pgraphID
+		for e in VR.profinetGraph.getOutEdges(pID):
+			c2ID = e[1]
+			for i,c2 in VR.components.items(): 
+				if c2.pgraphID == c2ID: break
+			x = getCPos(c) + [0,0,0.02]
+			y = getCPos(c2) + [0,0,0.02]
+			VR.ecadViz.addVector(x, y-x,[0.2,0.3,1],'',0)		
+	
+		
+
+
+
+		
+		
+		
+		
+
+						
+
+						
+							
+
+	
+
+			
+
+									
+								
+								
+								
+</core>
+    </Script>
+    <Script base_name="configureHMI" group="panel" name_space="__script__" name_suffix="0" persistency="666" server="server1" type="Python">
+      <core>
+	import VR, json
+	
+	#hmiVars = { 'buttons':['Start', 'Start2'] , 'entries':['Hello'] }
+	hmiVars = { 'buttons':[] , 'entries':[] } #, 'homebuttons':[] 
+	
+	for key,var in VR.profinetVariables.items():
+		if var.source == 'hmi':
+		
+			if var.remanence == 'Retain':
+				entry = {}
+				entry['name'] = key
+				entry['startValue'] = var.startValue
+				hmiVars['entries'].append(entry)
+				
+			if var.dataType == 'Bool':
+				hmiVars['buttons'].append(key)
+
+	"""for key,var in VR.hmiVariables.items():			
+		if var.source == 'hmiHome':
+			hmiVars['homebuttons'].append(key)"""
+	
+	
+	VR.sendHMI( 'hmi', json.dumps(hmiVars) )
+</core>
+    </Script>
+    <Script base_name="debugStop" group="no group" name_space="__script__" name_suffix="0" persistency="666" server="server1" type="Python">
+      <core>
+	import VR
+
+	"""
+	for n,v in VR.unit2E.variables.items():
+		if v.value == 1:
+			print v
+	"""
+	print 1, VR.profinetVariables['Button_Ext_Start'].value	
+	print 1, VR.profinetVariables['Button_Ext_Stop'].value	
+	print 0, VR.profinetVariables['Prc_Stop_Button'].value	
+	print 0, VR.profinetVariables['Alarms_1'].value	
+	print 1, VR.profinetVariables['Sft_Ext_Ok'].value	
+	print 1, VR.profinetVariables['Prc_Ext_Ok'].value	
+	print 1, VR.profinetVariables['Prc_Ext_Start_Motor'].value	
+	#print VR.profinetVariables['Prc_Start_Motor'].value	
+	#print VR.profinetVariables['Prc_Cmd_Start_Ext'].value	
+	print ' '
+	#VR.profinetVariables['Prc_Start_Motor'].value = 0
+	#VR.profinetVariables['Prc_Cmd_Start_Ext'].value = 0
+	#VR.unit2E.variables['Button_Ext_Stop'].value = 1
+	
+	#print VR.profinetVariables['Prc_Start_Motor'].value
+	"""
+	for n,v in VR.unit2E.variables.items():
+		if v.value == 1:
+			print v
+	"""
+</core>
+    </Script>
+    <Script base_name="fourrierAnalysis" group="kinematics" name_space="__script__" name_suffix="0" persistency="666" server="server1" type="Python">
+      <core>
+	import VR
+	from VR.Math import Vec3
+	from math import acos, atan2, sin
+	
+	import pylab as plt
+	import numpy, scipy.optimize
+
+	pi = 3.14159265359
+
+	
+	if not obj:
+		#obj = VR.machine.findAll('4507 372 03 Kettenrad kpl.z=23 t=1\' Bg=60')[0]
+		obj = VR.machine.findAll('4507 014 03 Zahnrad m=5 z=27 KV-120')[0]
+	
+		obj.setPickable(True)
+	
+	# gear vertices
+	geos = obj.getChildren(True, 'Geometry', True)
+	pos = []
+	for g in geos: pos += g.getPositions()
+	
+	
+	# gear direction
+	d = Vec3(obj.getEntity().getVector('axis')).normalize()
+	
+	def same(x,y):
+		return abs(x-y) &lt; 1
+	
+	def getRadii():
+		h = {}
+	
+		for p in pos:
+			p = p-d*d.dot(p)
+			l = p.length()
+		
+			added = False
+			for r,pnts in h.items():
+				if same(r,l): 
+					pnts.append(p)
+					added = True
+					break
+		
+			if not added:
+				h[l] = [p]
+			
+		for r,pnts in h.items():
+			if len(pnts) &gt; 50: print r, len(pnts) 
+		
+	def getPolar():
+		h = {}
+		
+		p0 = pos[0] # polar origin
+		p0 = p0-d*d.dot(p0)
+		p0.normalize()
+		
+		p1 = p0.cross(d)
+		
+		for p in pos:
+			p = p-d*d.dot(p)
+			r = p.length() # radius
+			
+			# go 2D
+			p.normalize()
+			p2 = [ p.dot(p0), p.dot(p1) ]
+			
+			# go polar
+			a = atan2(p2[0], p2[1])
+			h[a] = r
+		
+		# polar radius function
+		F = [ (a,h[a]) for a in sorted(h.iterkeys()) ]
+		return F
+		
+	def fit_sin(tt, yy):
+		'''Fit sin to the input time sequence, and return fitting parameters "amp", "omega", "phase", "offset", "freq", "period" and "fitfunc"'''
+		tt = numpy.array(tt)
+		yy = numpy.array(yy)
+		ff = numpy.fft.fftfreq(len(tt), (tt[1]-tt[0]))   # assume uniform spacing
+		Fyy = abs(numpy.fft.fft(yy))
+		guess_freq = abs(ff[numpy.argmax(Fyy[1:])+1])   # excluding the zero frequency "peak", which is related to offset
+		guess_amp = numpy.std(yy) * 2.**0.5
+		guess_offset = numpy.mean(yy)
+		
+		guess = numpy.array([guess_amp, 2.*numpy.pi*guess_freq, 0., guess_offset])
+		def sinfunc(t, A, w, p, c):  return A * numpy.sin(w*t + p) + c
+		popt, pcov = scipy.optimize.curve_fit(sinfunc, tt, yy, p0=guess)
+		A, w, p, c = popt
+		f = w/(2.*numpy.pi)
+		fitfunc = lambda t: A * numpy.sin(w*t + p) + c
+		return {"amp": A, "omega": w, "phase": p, "offset": c, "freq": f, "period": 1./f, "fitfunc": fitfunc, "maxcov": numpy.max(pcov), "rawres": (guess,popt,pcov)}
+		
+	def fitSine(F):
+		tt = numpy.array([ a + pi for a,r in F ])
+		tt2 = numpy.array([ a + pi for a,r in F ])
+		yy = numpy.array([ r for a,r in F ])
+
+		res = fit_sin(tt, yy)
+		#print( "Amplitude=%(amp)s, Angular freq.=%(omega)s, phase=%(phase)s, offset=%(offset)s, Max. Cov.=%(maxcov)s" % res )
+
+		if 0:
+			#plt.plot(tt, yy, "-k", label="y", linewidth=2)
+			plt.plot(tt, yy, "ok", label="y", linewidth=2)
+			plt.plot(tt2, res["fitfunc"](tt2), "r-", label="y fit curve", linewidth=2)
+			plt.legend(loc="best")
+			plt.show()
+		
+		return res
+	
+	def resample(F, d):
+		di = -3.2
+		F2 = []
+		for (a1,r1),(a2,r2) in zip(F[:-2],F[1:]):
+			while di &lt; a1: di += d
+			if di &gt; a2: continue
+			while di &lt; a2:
+				Px = r1+(r2-r1)/(a2-a1)*(di-a1)
+				F2.append((di,Px))
+				di += d
+		return F2	
+	
+	F = getPolar()
+	F = F[:int(len(F)*0.25)] # only take a quarter
+	F = resample(F, 0.01)
+	if len(F) &lt; 2: return [0,0,0,0,0]
+		
+	#getRadii()	
+	sine = fitSine(F)
+	
+	rm = sine['offset']
+	r1 = rm - abs(sine['amp'] )
+	r2 = rm + abs(sine['amp'])
+	f = sine['freq']
+	pitch = rm*sin(1.0/f)
+	Nteeth = int(round(2*pi*rm/pitch))
+	
+	if 0:
+		print 'gear:', obj.getName()
+		print ' radius1:', r1
+		print ' radius2:', r2
+		print ' teeth size:', r2-r1
+		print ' pitch:', pitch
+		print ' Nteeth:', Nteeth
+	
+	return [r1,r2,r2-r1,pitch,Nteeth]
+	
+		
+</core>
+      <arg type="NoneType" value="None" base_name="obj" name_space="fourrierAnalysis" name_suffix="0" persistency="666"/>
+    </Script>
+    <Script base_name="fuseData" group="dataFusion" name_space="__script__" name_suffix="0" persistency="666" server="server1" type="Python">
+      <core>
+	import VR
+
+	VR.mapECAD()
+	VR.buildECADgraph()
+</core>
+    </Script>
+    <Script base_name="gearSegmentation" group="kinematics" name_space="__script__" name_suffix="0" persistency="666" server="server1" type="Python">
+      <core>
+	import VR, random, time
+	from VR.Math import Vec3
+				
+	if hasattr(VR, 'visualsT'): VR.visualsT.destroy()
+	VR.visualsT = VR.Transform('visualsT')
+	VR.scene.addChild(VR.visualsT)
+	visuals = VR.AnalyticGeometry()
+	VR.visualsT.addChild(visuals)
+		
+	def getPositions(gear):
+		geos = gear.getChildren(True, 'Geometry', True)
+		pos = []
+		for g in geos: pos += g.getPositions()
+		return pos
+	
+	def getGearRadius(gear):
+		d = Vec3(gear.getEntity().getVector('axis')).normalize()
+		pos = getPositions(gear)
+		lmax = 0
+		lmin = 1e6
+		for p in pos:
+			p = p-d*d.dot(p)
+			l = p.length()
+			lmax = max(l,lmax)
+			lmin = min(l,lmin)
+		return lmin,lmax
+	
+	gears = [ e.getSGObject() for e in VR.onto.getEntities('Gear') ]
+		
+	for i,gear in enumerate(gears):
+		#if not i == 3: continue
+	
+		d, r1, r2 = VR.pcaAnalysis(gear)
+		gear.getEntity().setVector('axis', d)
+		rmin, rmax = getGearRadius(gear)
+		#print d, gear.getName(), rmin, rmax
+		
+		data = VR.fourrierAnalysis(gear) # [r1,r2,teeth,pitch,Nteeth]
+		
+		gear.getEntity().set('radius', str(rmax))
+		gear.getEntity().set('hole', str(rmin))
+		gear.getEntity().set('pitch', str(data[3]))
+		gear.getEntity().set('Nteeth', str(data[4]))
+		
+		# visual
+		bb = gear.getBoundingbox()
+		P = gear.getParent().getWorldPose()
+		p = P.mult( bb.center())
+		
+		po = gear.getPose()
+		po.setPos([0,0,0])
+		d = po.mult(d)
+		r1 = po.mult(r1)
+		r2 = po.mult(r2)
+		
+		pitch = data[3]
+		rm = (data[0]+data[1])*0.5
+		
+		visuals.addVector(p, d*0.1, [0,0,1])
+		visuals.addVector(p+r1*rm*0.001, r2*pitch*0.001, [1,0.8,0], '', 0)
+		visuals.setCircle(i, p, d, rmax*0.001, [0,1,1])
+		visuals.setCircle(len(gears)+i, p, d, rmin*0.001, [0,1,0])
+		
+	
+	
+	
+</core>
+      <trig type="on_device" dev="keyboard" state="Pressed" param="" key="32" base_name="trigger" name_space="__global__" name_suffix="12" persistency="666"/>
+    </Script>
+    <Script base_name="getRoute" group="no group" name_space="__script__" name_suffix="0" persistency="666" server="server1" type="Python">
+      <core>
+	import VR
+
+	pathing = VR.PathFinding()
+	pathing.setGraph(VR.electricGraph)
+	start = VR.componentIDs[ecadID1][0].egraphID
+	end   = VR.componentIDs[ecadID2][0].egraphID
+	nIDs  =  pathing.computePath(start, end)
+	return [ VR.componentsByGraphID[nID] for nID in nIDs ]
+</core>
+      <arg type="NoneType" value="None" base_name="ecadID1" name_space="getRoute" name_suffix="0" persistency="666"/>
+      <arg type="NoneType" value="None" base_name="ecadID2" name_space="getRoute" name_suffix="0" persistency="666"/>
+    </Script>
+    <Script base_name="getUnknownGeom" group="deprecated" name_space="__script__" name_suffix="0" persistency="666" server="server1" type="Python">
+      <core>
+	import VR
+
+
+	
+	unknown =[h]
+	
+	#detect all ecadID of which mcad Geometry is not unique 
+	for vrID1, component1 in VR.components.items():
+		for vrID2, component2 in VR.components.items():
+			if component1.geometry and component2.geometry:
+				#if component1.position[0] == component2.position[0] and component1.position[1] == component2.position[1] and component1.position[2] == component2.position[2]:
+				if not component1.ecadID == component2.ecadID and component1.geometry == component2.geometry:
+					#print component1.ecadID
+					unknown.append(component1.ecadID)
+	
+	
+
+	
+	return [i for i in unknown]
+					
+	
+	
+	
+			
+</core>
+    </Script>
+    <Script base_name="hideComponents" group="no group" name_space="__script__" name_suffix="0" persistency="666" server="server1" type="Python">
+      <core>
+	import VR
+
+
+	neededComponents1 = ['0681 760 09 Doppeldrucktaste',
+	#'4500 757 03 Kettenrad 3-fach t=1\' z=23 Bg=85',
+	'4507 031 03 Kettenrad 3-fach z=38;t=1;b=100;Bg=64',
+	'4507 008 11 Antriebswelle KV-120',
+	'4507 013 03 Zahnrad f. Getr. KV-120']
+
+	neededComponents2 = ['0681 760 09 Doppeldrucktaste',
+	'4507 011 02 Antriebswelle KV 120',
+	'4507 015 03 zahnrad',
+	'4507 014 03 Zahnrad m=5 z=27 KV-120',
+	'4507 341 03 Zahnradwelle m=2, z=22 f. KV-120']
+	
+	neededComponents3 = ['0681 760 09 Doppeldrucktaste',
+	'4507 012 02 Antriebswelle KV 120',
+	'4507 016 03 Zahnrad f. Getr. KV-120',
+	'4507 014 03 Zahnrad m=5 z=27 KV-120',
+	'4507 341 03 Zahnradwelle m=2, z=22 f. KV-120']
+	
+	
+	modelRoot = VR.scene.findAll('Extruder_Kinematik')[0]
+
+	for obj in modelRoot.getChildren(1): obj.hide()
+		
+	for obj in neededComponents3:
+		geo = VR.scene.findAll(obj)#[0]
+		for g in geo:
+			g.getParent().setVisible(True)
+			#g.makeUnique()
+			g.setVisible(True)
+	
+	VR.getRoot().findAll('engine')[0].setVisible(False)
+	VR.getRoot().findAll('panel')[0].setVisible(False)
+	VR.getRoot().findAll('visualsT')[0].setVisible(False)
+	
+	
+	VR.showViz = False
+	VR.computeViz()
+</core>
+      <trig type="on_device" dev="keyboard" state="Pressed" param="" key="108" base_name="trigger" name_space="__global__" name_suffix="14" persistency="666"/>
+    </Script>
+    <Script base_name="houghAnalysis" group="kinematics" name_space="__script__" name_suffix="0" persistency="666" server="server1" type="Python">
+      <core>
+	import VR, random
+	from math import sin, cos, floor
+	from VR.Math import Vec3
+
+	class Accumulator:
+		def __init__(self, res):
+			self.res = res
+			self.cells = [0]*res[0]*res[1]*res[2]
+			
+		def index(self, i, j, k):
+			r = self.res
+			l = int(i*r[1]*r[2]+j*r[2]+k)
+			if l &lt; len(self.cells) and l &gt;= 0: return l
+			print 'AAA', i, j, k, l, len(self.cells)
+			return 0
+			
+		def cellCoords(self,l):
+			r = self.res
+			i = floor(l/(r[1]*r[2]))
+			j = floor((l-i*r[1]*r[2])/r[2])
+			k = l-i*r[1]*r[2]-j*r[2]
+			return [i,j,k]
+			
+		def getCell(self, i, j, k):
+			l = self.index(i,j,k)
+			return self.cells[l]
+			
+		def setCell(self, i, j, k, v):
+			l = self.index(i,j,k)
+			self.cells[l] = v
+			
+		def incrementCell(self, i, j, k):
+			l = self.index(i,j,k)
+			self.cells[l] += 1
+			
+	def genPoint(R):
+		x = random.random()*R
+		y = random.random()*R
+		z = random.random()*R
+		return Vec3([x,y,z])
+			
+	def genPlane(n,R,N):
+		n = n.normalize()
+		pnts = []
+		for i in range(N):
+			p = genPoint(R)
+			p -= n*p.dot(n)
+			pnts.append(p)
+		return pnts
+	
+	def detectDir(obj):
+		res = [20,20,20]
+		pi = 3.14159265359
+		
+		box = obj.getBoundingbox()
+		boxR = box.radius()
+		
+		geos = obj.getChildren(True, 'Geometry', True)
+		
+		pos = []
+		for g in geos: pos += g.getPositions()
+		#pos = genPlane(Vec3([0,1,1]), boxR, 200)
+		
+		acc = Accumulator(res)
+		for p in pos[:NPmax]: # bottleneck
+			for ai in range(res[0]):
+				a = ai*pi/res[0]
+				ca = cos(a)
+				sa = sin(a)
+				for bi in range(res[1]):
+					b = bi*pi/res[1]
+					cb = cos(b)
+					sb = sin(b)
+					r = p[0]*ca*sb + p[1]*sa*sb + p[2]*cb
+					ri = round(r/boxR*res[2] + res[2]*0.5)
+					acc.incrementCell(ai,bi,ri)
+				
+		def sign(v):
+			if v &gt;= 0: return 1
+			return -1
+				
+		def toPlane(l):
+			d = acc.cellCoords(l)
+			a,b,r = d[0]*pi/res[0], d[1]*pi/res[1], (d[2]-res[2]*0.5)*boxR/res[2]
+			ca, sa, cb, sb = cos(a),sin(a),cos(b),sin(b)
+			n = Vec3([ca*sb, sa*sb, cb])
+			return n, r
+				
+		# detect main plane direction
+		mainDir = Vec3([0,0,0])
+		bMax = max(acc.cells)
+		for i,c in enumerate(acc.cells):
+			P = toPlane(i)
+			d = P[0]#*sign(P[1])
+			#w = float(c)/bMax
+			if c == bMax: mainDir = d
+			
+		print 'mainDir', mainDir
+		mainDir.normalize()
+		return mainDir, len(geos), len(pos)
+
+	return detectDir(obj)
+</core>
+      <arg type="NoneType" value="None" base_name="obj" name_space="houghAnalysis" name_suffix="0" persistency="666"/>
+      <arg type="NoneType" value="None" base_name="NPmax" name_space="houghAnalysis" name_suffix="0" persistency="666"/>
+    </Script>
+    <Script base_name="importData" group="dataImport" name_space="__script__" name_suffix="0" persistency="666" server="server1" type="Python">
+      <core>
+	import VR	
+
+	VR.components = {}
+	VR.componentIDs = {}
+	
+	VR.importMCAD()
+	VR.importECAD()
+	VR.importLogic()
+
+
+	
+
+
+		
+		
+		
+		
+		
+		
+</core>
+    </Script>
+    <Script base_name="importECAD" group="dataImport" name_space="__script__" name_suffix="0" persistency="666" server="server1" type="Python">
+      <core>
+	import VR
+	from lxml import etree as ET
+	from VR.Math import Vec3
+	
+	
+	def join(plantID1, plantID2, id1, kind, id2):
+		a = '+'
+		b = ''
+		c = '-'
+		seq1 = [plantID1, plantID2]
+		seq2 = [id1, kind, id2]
+		if plantID1 == None or (id1 == None and id2 == None): return None, None, None, None, None
+		if plantID2 == None: 
+			a = ''
+			seq1 = [plantID1]
+		if id1 == None: seq2 = [kind, id2]
+		if id2 == None: seq2 = [id1, kind] 
+		if len(seq1) == 1: c = '+-'
+		seq3 = [a.join(seq1), b.join(seq2)]
+		full_ecadID = '='+c.join(seq3)
+		return full_ecadID
+	
+	def split(string, c):
+		if not string: return None, None
+		data = string.split(c)
+		if len(data) &gt; 2: return data[0], ':'.join(data[1:])
+		if len(data) == 2: return data[0], data[1]
+		if len(data) == 1: return data[0], None
+		#return None, None
+	
+	class Address:
+		def __init__(self, a):
+			self.address = a
+			self.ecadID = None
+			self.machine = None
+			self.component = None
+			self.socket = None
+			self.port = None
+		
+		def __repr__(self):
+			return str(self.address)+'('+str(self.machine)+' '+str(self.component)+' '+str(self.socket)+' '+str(self.port)+')'
+
+	class Port:
+		def __init__(self, name):
+			self.name = name
+			self.entity = None
+			self.connection = None
+			self.ladHWaddr = None
+			self.ecadHWaddr = None
+			self.socket = None
+			
+		def __repr__(self):
+			return 'Port: ' + str(self.name) + ', HW addr: ' + str(self.ladHWaddr)
+
+	class Connection:
+		def __init__(self):
+			self.entity = None
+			self.source = None
+			self.target = None
+			self.label = ''
+			self.cType = 'none'
+			if self.label == '':
+				self.label = 'Default'
+		
+		def __repr__(self):
+			return str(self.source)+'----'+self.label+'-----'+str(self.target)
+			
+		def getThis(self, first):
+			if self.target.ecadID == first.ecadID: return self.target
+			return self.source
+			
+		def getOther(self, first):
+			if self.target.ecadID == first.ecadID: return self.source
+			return self.target
+		
+	def importXML(path):
+		tree = ET.parse(path)
+		root = tree.getroot()
+		return root
+	
+	def parseAddress(address):
+		a = Address(address)
+		s1 = address.split('-')
+		if len(s1) == 3 and s1[2] == '': del s1[2]
+		a.machine = s1[0]
+		a.ecadID = address.split(':')[0]
+		
+		if len(s1) == 2: 
+			s2 = s1[1].split(':')
+			a.socket = s2[0]
+			if len(s2) &gt; 1: a.port = s2[1]
+	
+		if len(s1) == 3: 
+			a.component = s1[1]
+			if a.component[-1] == ':': a.component = a.component[:-1]
+			s2 = s1[2].split(':')
+			a.socket = s2[0]
+			if len(s2) &gt; 1: a.port = s2[1]
+			a.ecadID = a.machine+'-'+a.component
+			
+		return a
+		
+	def isProfinet(address): # TODO
+		# case XPi, i a number
+		for i in range(0,10):
+			if 'XP'+str(i) in [address.socket, address.port]: return True
+			if 'XPN'+str(i) in [address.socket, address.port]: return True
+		# case X1:P
+		if address.port:
+			if 'X1' in address.socket and address.port[0] == 'P': return True
+		# case XFP3
+		if address.socket == 'XFP3': return True
+		return False
+
+	# get ecad components
+	bmk = importXML('data/ECAD/EDC/bmk.edc')
+	for node in bmk.iter('O17'):
+		ecadID = node.get('P20006').encode('utf-8').strip()
+		name = node.get('P20100_1').encode('utf-8').strip()
+		if name == '': continue
+		if ecadID in VR.componentIDs: continue
+		component = VR.Component(name, ecadID, None)
+
+	# get ecad wires
+	edges = importXML('data/ECAD/EDC/Verbindungen.edc')
+	for edge in edges.iter('O18'):
+		target = edge.get('P31020').encode('utf-8').strip()
+		source = edge.get('P31019').encode('utf-8').strip()
+		label  = edge.get('P31011').encode('utf-8').strip()
+		
+		source = parseAddress(source)
+		target = parseAddress(target)
+		
+		if label == '': label = 'default'
+		if source.port == 'PE' or target.port == 'PE': continue # ignore grounding
+	
+		connection = Connection()
+		connection.target = target
+		connection.source = source
+		connection.label  = label		
+		connection.cType = 'electric'
+		for a in [source, target]:
+			if isProfinet(a): connection.cType = 'profinet'
+	
+		if not source.ecadID in VR.componentIDs:
+			VR.Component(None, source.ecadID, None)
+		
+		if not target.ecadID in VR.componentIDs:
+			VR.Component(None, target.ecadID, None)
+		
+		for component in VR.componentIDs[source.ecadID]:
+			component.connections.append(connection)
+		for component in VR.componentIDs[target.ecadID]:
+			component.connections.append(connection)
+	
+	ecadProject = importXML('data/ECAD/EPJ/Extruder.epj')
+	for i in ecadProject.iter('O117'):
+		for j in i.iter('P11'): # get ecad -&gt; mcad mapping data
+			if not j.get('P22003') or not j.get('P22001'): continue
+			mcadID = j.get('P22003').encode('utf-8').strip()
+			name = j.get('P22001').encode('utf-8').strip()
+			if name in VR.componentIDs:
+				for component in VR.componentIDs[name]: #get mcadID from ECAD Project
+					component.setMcadID(mcadID)
+
+	VR.objectsByBaseName = {}
+
+	def traverseScene(obj):
+		baseName = obj.getBaseName() # Warning! base name is not unique!
+		#name = obj.getName()
+		VR.objectsByBaseName[baseName] = obj
+		#VR.objectsByName[name] = obj
+		for child in obj.getChildren(): traverseScene(child)
+	traverseScene(VR.scene)
+
+	#make 100% sure each component has correct ecadID and mcadID based on traverse scene 		
+	for i in ecadProject.iter('O117'):
+		for j in i.iter('P11'):
+			if not j.get('P22001') or not j.get('P22003'): continue		
+			mcadID = j.get('P22003').encode('utf-8').strip()
+			name = j.get('P22001').encode('utf-8').strip()
+			for obj in VR.objectsByBaseName: 
+				if mcadID in obj: #if mcadID is not in traversed scene
+					for s in ecadProject.iter('O17'): #get correct mcadID
+						for t in s.iter('P11'):
+							for key, value in t.attrib.items():
+								if name == value: 
+									for l in s.iter('P150'):
+										plant1 = l.get('P1100')#.encode('utf-8').strip()
+										plant2 = l.get('P1200')#.encode('utf-8').strip()
+										id1 = l.get('P20012')#.encode('utf-8').strip()
+										kind = l.get('P20013')#.encode('utf-8').strip()
+										id2 = l.get('P20014')#.encode('utf-8').strip()
+
+										corrspd_ecadID = join(plant1,plant2,id1,kind,id2)
+
+										for k in VR.componentIDs:
+											if corrspd_ecadID == VR.componentIDs[k][0].ecadID:
+												VR.componentIDs[k][0].mcadID = mcadID
+												VR.componentIDs[k][0].name = name
+													
+	
+	# get ecad -&gt; LAD mapping data
+	O117_data = {}	
+	for i in ecadProject.iter('O117'):
+		name = None
+		IN_O117 = []
+		
+		for j in i.iter('P11'):
+			if j.get('P21002_1') and j.get('P21000_1'): 
+				IN = j.get('P21002_1').encode('utf-8').strip()
+				PO = j.get('P21000_1').encode('utf-8').strip()
+				IN_O117.append( (IN,PO) )
+			if j.get('P22001'): name = j.get('P22001').encode('utf-8').strip()
+		
+		if len(IN_O117) &gt; 0 and name: 
+			if not name in O117_data: O117_data[name] = {}
+			for IN,PO in IN_O117:
+				O117_data[name][IN] = PO
+		
+	O17_data = {}
+	for s in ecadProject.iter('O17'): #get correct mcadID
+		ecadID = None
+		IN_O17 = []
+		
+		for l in s.iter('P150'): # get ecad ID
+			plant1 = l.get('P1100')#.encode('utf-8').strip()
+			plant2 = l.get('P1200')#.encode('utf-8').strip()
+			id1 = l.get('P20012')#.encode('utf-8').strip()
+			kind = l.get('P20013')#.encode('utf-8').strip()
+			id2 = l.get('P20014')#.encode('utf-8').strip()
+			ecadID = join(plant1,plant2,id1,kind,id2)
+	
+		for t in s.iter('P11'):
+			if t.get('P20407') and t.get('P20400'):
+				IN = t.get('P20407').encode('utf-8').strip()
+				AD = t.get('P20400').encode('utf-8').strip()
+				IN_O17.append( (IN,AD) )
+			
+		if len(IN_O17) &gt; 0 and ecadID: 
+			if not ecadID in O17_data: O17_data[ecadID] = {}
+			for IN,AD in IN_O17:
+				O17_data[ecadID][IN] = AD
+	
+	# add module ports
+	for name, dataO117 in O117_data.items():
+		if name in VR.componentIDs:
+			component = VR.componentIDs[name][0]
+			if component.ecadID in O17_data:
+				dataO17 = O17_data[component.ecadID]
+				for IN in dataO117:
+					if IN in dataO17:
+						LADaddr = dataO17[IN]
+						if LADaddr[0] == 'E': LADaddr = '%I'+LADaddr[1:]
+						if LADaddr[0] == 'A': LADaddr = '%O'+LADaddr[1:]
+						p = Port(dataO117[IN])
+						if not p.name: print 'AAAA3'
+						p.ladHWaddr = LADaddr
+						p.ecadHWaddr = dataO17[IN]
+						p.socket = IN
+						component.ports[p.name] = p
+						
+	def getPort(others):
+		for i in range(50):
+			k = str(i)
+			if k in others: continue
+			return k
+		return None
+	
+	# add component ports
+	for ID, component in VR.components.items():
+		b = bool(component.name == 'SIE.Sinamics G120C FS(AA) 380-480V 0,55kW mit Filter')
+		for connection in component.connections:
+			for address in [connection.source, connection.target]:
+				if address.ecadID == component.ecadID:
+					if not address.port: address.port = getPort(component.ports)
+					if address.port in component.ports:
+						if not component.ports[address.port].connection:
+							 component.ports[address.port].connection = connection
+						if component.ports[address.port].connection == connection: continue
+						i,P = 0,address.port
+						while address.port in component.ports:
+							address.port = P + str(i)
+							i += 1
+					p = Port(address.port)
+					p.connection = connection
+					component.ports[p.name] = p
+				
+		
+												
+</core>
+    </Script>
+    <Script base_name="importLogic" group="dataImport" name_space="__script__" name_suffix="0" persistency="666" server="server1" type="Python">
+      <core>
+	import VR
+	import xml.etree.ElementTree as ET
+
+	namespace = '{http://www.siemens.com/automation/Openness/SW/NetworkSource/FlgNet/v1}'
+	namespace2 = '{http://www.siemens.com/automation/Openness/SW/Interface/v2}'
+	folder = 'MA_Thesis/03_TIA_Portal/Gumball_Line_180117_V14.ap14/Extruder_Machine/'
+	
+	verbose = False #set True for tick-prints
+	#verbose = True
+	
+	def getTag(node):
+		if not hasattr(node, 'tag'): return 'noTag'
+		tag = node.tag
+		if tag[0] == '{': tag = tag.split('}')[1]
+		return tag
+	
+	def printNode(node, depth = -1, padding = ''):
+		print padding, getTag(node), node.attrib
+		if depth == 0: return
+		for child in node:
+			printNode(child, depth-1, padding+' ')		
+			
+	class Variable:
+		def __init__(self):
+			self.name = ''
+			self.logicalAddress = ''
+			self.dataType = ''
+			self.value = 0
+			self.startValue = 0
+			self.source = ''
+			self.remanence = ''
+			
+		def __repr__(self):
+			return 'Name:  '+str(self.name)+'  Address: '+str(self.logicalAddress)+'  Type: '+str(self.dataType)+'  StartValue: '+str(self.startValue)+'  value: '+str(self.value)
+	
+	
+	class CompileUnit:
+		def __init__(self, ID):
+			self.ID = ID
+			self.parts = {}
+			self.wires = {}
+			self.accesses = {}
+			self.variables = {}
+			self.poweredWireIDs = []
+			
+		def __repr__(self):
+			s = 'CompileUnit: '+str(self.ID)
+			s += '\n'
+			for ID, c in self.parts.items(): s += ', '+str(c)
+			s += '\n'
+			for ID, c in self.wires.items(): s += ', '+str(c)
+			s += '\n'
+			for ID, c in self.accesses.items(): s += ', '+str(c)
+			return s
+	
+	class Part:
+		def __init__(self, ID, cu, name):
+			self.ID = ID
+			self.cu = cu
+			self.name = name
+			self.inputs = []
+			self.outputs = []
+			self.operands = []
+			self.negated = False
+			self.lastComputationResult = 0
+			
+		def getOperands(self):
+			res = []
+			for o in self.operands:
+				if o in self.cu.wires:
+					isIn = o in self.inputs
+					res.append( (self.cu.wires[o],isIn) )
+			return res
+			
+		def getVariables(self):
+			ops = self.getOperands()
+			res = []
+			for op,isIn in ops:
+				if op and op.accessID in self.cu.accesses:
+					opAccess = self.cu.accesses[op.accessID]
+					if opAccess.variable in self.cu.variables:
+						res.append( (self.cu.variables[opAccess.variable], isIn) )
+					elif opAccess.constant: 
+						v = Variable()
+						v.value = opAccess.components[0]
+						res.append( (v, isIn) )
+			return res
+			
+		def getVariable(self, i = -1):
+			vs = self.getVariables()
+			if vs == []: return (None,None)
+			return vs[i]
+			
+		def isOperand(self):
+			return self.name in ['Contact', 'PContact', 'Coil', 'RCoil', 'Ge', 'Lt']
+			
+		def isBlock(self):
+			return self.name in ['Calc', 'Move', 'Round']
+					
+		def computeOperandOutput(self, value = 0):
+			variable = self.getVariable()[0]
+			if not variable:
+				#print 'Warning:', self.name, 'has no variable!'
+				return value
+			
+			if self.name == 'Coil':
+				#TODO: resolve this workaround!
+				if variable.name in ['Prc_Ext_Ok']: return 0
+			
+				if not variable.value == value:
+					if not variable.name in ['SS_CMD_Hopper', 'Sft_Ext_Block']:
+						print 'LAD   set', variable.value, '-&gt;', value, variable.name
+				variable.value = value
+				return 0
+				
+			if self.name == 'RCoil':
+				if not variable.value == variable.startValue:
+					print 'LAD reset', variable.value, '-&gt;', variable.startValue, variable.name
+				variable.value = variable.startValue
+				return 0
+			
+			if value == 0: return 0
+			
+			var = float(variable.value)
+			if self.name == 'Contact' or self.name == 'PContact':
+				if self.negated and var == 0: return value 
+				if self.negated and var == 1: return 0
+				return var*value
+			if verbose: print 'Warning! computeOutput not handled!'
+			return 0
+			
+		def computeBlockOutput(self, value = 0):
+			if value == 0: return 0
+		
+			inputs = []
+			outputs = []
+			for v,isIn in self.getVariables():
+				if isIn: inputs.append(v)
+				else: outputs.append(v)
+				
+			if self.name == 'Calc':
+				# berechnet anhand der input "operanden" und schreibt in output "operand"
+				# get function from data!
+					
+				# hard coded test!
+				outputs[0].value = str(float(inputs[0].value) * float(inputs[1].value))
+				return 1
+				
+			if self.name == 'Move':
+				outputs[0].value = inputs[0].value
+				return 1
+				
+			if self.name == 'Round': # TODO
+				outputs[0].value = inputs[0].value
+				return 1
+			
+		def __repr__(self):
+			s = 'Part: '+str(self.ID)+' '+self.name+' Op:'+str(self.operands)+' Neg:'+str(self.negated)+' ['
+			for c in self.inputs: s += ' '+c
+			s += ' -&gt; '
+			for c in self.outputs: s += ' '+c
+			s += ']'
+			return s
+			
+	class Access:
+		def __init__(self, ID, cu):
+			self.ID = ID
+			self.cu = cu
+			self.components = []
+			self.variable = None
+			self.constant = False
+			
+		def __repr__(self):
+			s = 'Access: '+str(self.ID)
+			for c in self.components: s += ', '+c
+			return s
+			
+	class Wire:
+		def __init__(self, ID, cu):
+			self.name = 'wire'
+			self.ID = ID
+			self.cu = cu
+			self.inputs = []
+			self.outputs = []
+			self.accessID = None
+			self.operand = None
+			self.powerrail = False
+			self.lastComputationResult = 0
+			
+		def addInput(self, ID):
+			self.inputs.append(ID)
+			if ID in self.cu.parts: self.cu.parts[ID].outputs.append(self.ID)
+			
+		def addOutput(self, ID):
+			self.outputs.append(ID)
+			if ID in self.cu.parts: self.cu.parts[ID].inputs.append(self.ID)
+			
+		def addOperand(self, ID):
+			self.operand = ID
+			if ID in self.cu.parts: self.cu.parts[ID].operands.append( self.ID )
+			
+		def __repr__(self):
+			s = 'Wire: ID '+str(self.ID)+' Ac'+str(self.accessID)+' Op'+str(self.operand)+' PR'+str(self.powerrail)+' ['
+			for c in self.inputs: s += ' '+c
+			s += ' -&gt; '
+			for c in self.outputs: s += ' '+c
+			s += '] '
+			return s
+			
+			
+	# get variables
+	def getVariables():
+		variables = {}
+		
+		# hardware variables, pins, sockets, etc..
+		treeTagtable = ET.parse(folder+'PLC-Variablen/Default tag table.xml') #HMI_Ext_Start_M mit Adresse
+		rootTagTable = treeTagtable.getroot()
+		for tag in rootTagTable.iter('SW.Tags.PlcTag'):
+			variable = Variable()
+			variable.source = 'hardware'
+			for name in tag.iter('Name'):
+				variable.name = name.text
+			for logicalAddress in tag.iter('LogicalAddress'):
+				variable.logicalAddress = logicalAddress.text
+			for dataType in tag.iter('DataTypeName'):
+				variable.dataType = dataType.text
+			variables[variable.name] = variable
+			
+		# program internal variables
+		treeTagtable = ET.parse(folder+'Programmbausteine/003_Process_Data.xml')	
+		rootTagTable = treeTagtable.getroot()
+		for member in rootTagTable.iter(namespace2+'Member'):
+			variable = Variable()
+			variable.source = 'internal'
+			variable.name = member.attrib['Name']
+			variable.dataType = member.attrib['Datatype']
+			variables[variable.name] = variable
+		
+		# hmi variables
+		treeTagtable = ET.parse(folder+'Programmbausteine/005_HMI_Data.xml')	#HMI_Ext_Start mit Datatype
+		rootTagTable = treeTagtable.getroot()
+		for member in rootTagTable.iter(namespace2+'Member'):
+			variable = Variable()
+			variable.source = 'hmi'
+			variable.name = member.attrib['Name']
+			variable.dataType = member.attrib['Datatype']
+			if 'Remanence' in member.attrib: variable.remanence = member.attrib['Remanence']
+			for startValue in member.iter(namespace2+'StartValue'):
+				variable.startValue = startValue.text
+				variable.value = variable.startValue
+			variables[variable.name] = variable
+		
+		# Alarms	
+		treeTagtable = ET.parse(folder+'Programmbausteine/004_Alarms_Data.xml')	
+		rootTagTable = treeTagtable.getroot()
+		for member in rootTagTable.iter(namespace2+'Member'):
+			variable = Variable()
+			variable.source = 'alarm'
+			variable.name = member.attrib['Name']
+			variable.dataType = member.attrib['Datatype']
+			variables[variable.name] = variable
+		
+		#VFD Control Block
+		"""treeTagtable = ET.parse(folder+'Programmbausteine/003_VFD_Control_G120C_MM.xml')	
+		rootTagTable = treeTagtable.getroot()
+		for member in rootTagTable.iter(namespace2+'Member'):
+			variable = Variable()
+			variable.source = 'VFD'
+			variable.name = member.attrib['Name']
+			variable.dataType = member.attrib['Datatype']
+			variables[variable.name] = variable"""
+		
+		#VFD PAW
+		treeTagtable = ET.parse(folder+'Programmbausteine/003_VFD_PAW.xml')	
+		rootTagTable = treeTagtable.getroot()
+		for member in rootTagTable.iter(namespace2+'Member'):
+			variable = Variable()
+			variable.source = 'vfd'
+			variable.name = member.attrib['Name']
+			variable.dataType = member.attrib['Datatype']
+			if 'Remanence' in member.attrib: variable.remanence = member.attrib['Remanence']
+			for startValue in member.iter(namespace2+'StartValue'):
+				variable.startValue = startValue.text
+			variables[variable.name] = variable
+		
+		#VFD PEW
+		treeTagtable = ET.parse(folder+'Programmbausteine/003_VFD_PEW.xml')	
+		rootTagTable = treeTagtable.getroot()
+		for member in rootTagTable.iter(namespace2+'Member'):
+			variable = Variable()
+			variable.source = 'vfd'
+			variable.name = member.attrib['Name']
+			variable.dataType = member.attrib['Datatype']
+			if 'Remanence' in member.attrib: variable.remanence = member.attrib['Remanence']
+			for startValue in member.iter(namespace2+'StartValue'):
+				variable.startValue = startValue.text
+			variables[variable.name] = variable
+		
+			
+		return variables
+	
+	# get compile units
+	def getCompileUnits():
+		res = []
+		tree = ET.parse(folder+'Programmbausteine/003_Process.xml')  # HMI_Ext_Start + HMI_Ext_Start_M mit powered wires
+		for FC in tree.getroot().findall('SW.Blocks.FC'):
+			for objectList in FC.findall('ObjectList'):
+				for compileUnit in objectList.findall('SW.Blocks.CompileUnit'):
+					res.append(compileUnit)
+		return res
+		
+	# get parts and wires of a compile unit
+	def getPartsAndWires(compileUnit):
+		rparts = []
+		rwires = []
+		raccesses = []
+		for attributeList in compileUnit.findall('AttributeList'):
+			for networkSource in attributeList.findall('NetworkSource'):
+				# StatementList ?
+				for flgNet in networkSource.findall(namespace+'FlgNet'):
+					for parts in flgNet.findall(namespace+'Parts'): 
+						for access in parts.findall(namespace+'Access'): raccesses.append(access)
+						for part in parts.findall(namespace+'Part'): rparts.append(part)
+					for wires in flgNet.findall(namespace+'Wires'):
+						for wire in wires.findall(namespace+'Wire'): rwires.append(wire)
+		return rparts, rwires, raccesses
+				
+	# get all compile units
+	def setupCompileUnits(variables):
+		compileUnits = {}
+		for compileUnitNode in getCompileUnits():
+			parts, wires, accesses = getPartsAndWires(compileUnitNode)
+			compileUnit = CompileUnit(compileUnitNode.attrib['ID'])
+			compileUnit.variables = variables
+		
+			for partNode in parts:
+				part = Part(partNode.attrib['UId'], compileUnit, partNode.attrib['Name'])
+				if not partNode.find(namespace+'Negated') == None: part.negated = True
+				compileUnit.parts[part.ID] = part
+			
+			for accessNode in accesses:
+				UId = accessNode.attrib['UId']
+				access = Access(UId, compileUnit)
+				Symbol = accessNode.find(namespace+'Symbol')
+				if not Symbol == None:
+					for component in Symbol.findall(namespace+'Component'):
+						name = component.attrib['Name']
+						access.components.append(name)
+						if name in variables: access.variable = name
+				
+				Constant = accessNode.find(namespace+'Constant')#if there are constant accesses
+				if not Constant == None:
+					access.constant = True
+					for value in Constant.findall(namespace+'ConstantValue'):
+						access.components.append(value.text)
+					for value in Constant.findall(namespace+'ConstantType'):
+						access.components.append(value.text)
+						
+				compileUnit.accesses[access.ID] = access
+			compileUnits[compileUnit.ID] = compileUnit
+			
+			for wireNode in wires:
+				wire = Wire(wireNode.attrib['UId'], compileUnit)
+				identCon = wireNode.find(namespace+'IdentCon')
+				if not identCon == None: wire.accessID = identCon.attrib['UId']
+				powerrail = wireNode.find(namespace+'Powerrail')
+				if not powerrail == None: 
+					wire.powerrail = True
+					compileUnit.poweredWireIDs.append(wire.ID)
+				for nameCon in wireNode.findall(namespace+'NameCon'):
+					UId = nameCon.attrib['UId']
+					name = nameCon.attrib['Name']
+					if name.startswith('pre'): wire.addOutput(UId) # TODO: check if correct
+					if name.startswith('in'): wire.addOutput(UId)
+					if name.startswith('eno'): wire.addInput(UId)
+					elif name.startswith('en'): wire.addOutput(UId)
+					if name.startswith('out'): wire.addInput(UId)
+					if name.startswith('operand'): wire.addOutput(UId)
+					if wire.accessID in compileUnit.accesses: wire.addOperand(UId)
+				compileUnit.wires[wire.ID] = wire
+				
+		if 0:
+			for ID, compileUnit in compileUnits.items():
+				print compileUnit
+				print '\n'
+				
+		return compileUnits
+	
+	VR.profinetVariables = getVariables()
+	VR.compileUnits = setupCompileUnits(VR.profinetVariables)
+	VR.configureHMI()
+	
+	VR.unit2E = VR.compileUnits['2E']
+	
+	
+	
+	#Test all variables for start function
+	VR.unit2E.variables['Button_Ext_Stop'].value = 1 # schalter am extruder, info muss aus ECAD kommen, E9.6
+	VR.unit2E.variables['Prc_Ext_Ok'].value = 1 # viele inputs aus ECAD, E9.1, E9.2, E9.3, E9.6, E9.7, DB2.DBX4.0
+	
+	
+	#VR.unit2E.tick() #check if verbose is set to true for printing
+	#print VR.unit2E.variables['HMI_Torque_Block'].startValue
+	
+	
+	#VR.LADviz()
+
+
+
+	
+	
+	
+</core>
+    </Script>
+    <Script base_name="importMCAD" group="dataImport" name_space="__script__" name_suffix="0" persistency="666" server="server1" type="Python">
+      <core>
+	import VR
+
+	if hasattr(VR, 'machine'): VR.machine.destroy()
+	VR.machine = VR.Object('machine')
+	VR.scene.addChild(VR.machine)
+	
+	s = 0.001
+
+	#path = 'data/step/5016 486 00-117087.STEP'
+	#path = 'data/step/Kinematik_aktiv2_AP214.STEP'
+	#path = 'data/step/Extruder_AP214.STEP'
+	path = 'data/step/Extruder_Kinematik.STEP'
+
+	mcad = VR.loadGeometry(path, useBinaryCache = True)
+	mcad.setScale([s,s,s])
+	VR.machine.addChild(mcad)
+
+	# fix some node names
+	def traverseScene(obj):
+		name = obj.getBaseName()
+		if '0610 003 03' in name: obj.setName(name+' motor')
+		if '0681 760 09' in name: obj.setName(name+' Doppeldrucktaste')
+		if '4507 015 03' in name: obj.setName(name+' zahnrad')
+		for child in obj.getChildren(): traverseScene(child)
+		
+	traverseScene(mcad)
+
+	# define motor gear
+	gear = VR.machine.findAll('4500 757 03 Kettenrad 3-fach t=1\' z=23 Bg=85')[0]
+	VR.motorGear = gear.getParent()
+	
+	#define gear connected to motor gear
+	VR.gearToMotorGear = VR.machine.findAll('4507 031 03 Kettenrad 3-fach z=38;t=1;b=100;Bg=64') [0]
+</core>
+    </Script>
+    <Script base_name="importXML" group="dataImport" name_space="__script__" name_suffix="0" persistency="666" server="server1" type="Python">
+      <core>
+	import VR
+	from lxml import etree as ET
+
+	tree = ET.parse(path)
+	root = tree.getroot()
+	return root
+</core>
+      <arg type="NoneType" value="None" base_name="path" name_space="importXML" name_suffix="0" persistency="666"/>
+    </Script>
+    <Script base_name="init" group="no group" name_space="__script__" name_suffix="0" persistency="666" server="server1" type="Python">
+      <core>
+	import VR
+	
+	if hasattr(VR, 'scene'): VR.scene.destroy()
+	VR.scene = VR.Object('scene', 'light')
+	
+	VR.initEngineMockUp()
+	
+	VR.importData()
+	
+	VR.fuseData()
+	#VR.computeViz()
+	#VR.statistics()
+	VR.initOntology()
+	
+	VR.panelInit()
+	
+	# schalte leistungsschalter ein
+	for k,component in VR.components.items():
+		if 'Leistungsschalter' in component.name:
+			component.entity.set('state', 'pressed')
+	VR.showViz = True
+	VR.simECAD()
+	
+	VR.gearSegmentation(0)
+	VR.parametrizeMechanism()
+
+
+	
+	
+	
+</core>
+      <trig type="on_scene_load" dev="keyboard" state="Pressed" param="" key="-1" base_name="trigger" name_space="__global__" name_suffix="1" persistency="666"/>
+      <trig type="on_device" dev="keyboard" state="Pressed" param="" key="105" base_name="trigger" name_space="__global__" name_suffix="17" persistency="666"/>
+    </Script>
+    <Script base_name="initEngineMockUp" group="engineMockup" name_space="__script__" name_suffix="0" persistency="666" server="server1" type="Python">
+      <core>
+	import VR
+
+	if hasattr(VR, 'engineMockUp'): VR.engineMockUp.destroy()
+	VR.engineMockUp = VR.Transform('engine', 'light')
+	
+	def addPrim(params, p):
+		o = VR.Geometry('part')
+		o.setPrimitive(params)
+		o.setPose(p)
+		VR.engineMockUp.addChild(o)
+		
+	addPrim('Box 0.2 0.2 0.4', VR.Pose([0,0,0]))
+	addPrim('Cylinder 0.2 0.02 16 1 1 1', VR.Pose([0,0,0.3], [0,-1,0], [0,0,1]))
+	addPrim('Gear 0.03 0.02 0.02 26 0.01 0', VR.Pose([0,0,0.3]))
+	
+	VR.engineMockUp.setFrom([-0.75,1.75,-0.35])
+	VR.engineMockUp.setScale([0.3,0.3,0.3])
+</core>
+    </Script>
+    <Script base_name="initOntology" group="semanticLayer" name_space="__script__" name_suffix="0" persistency="666" server="server1" type="Python">
+      <core>
+	import VR
+	
+	VR.setupTaxonomy()	
+	VR.populateOntology()
+</core>
+    </Script>
+    <Script base_name="keyboard" group="no group" name_space="__script__" name_suffix="0" persistency="666" server="server1" type="Python">
+      <core>
+	import VR
+
+
+	if dev.getKey() == 104: 
+		VR.showViz = not VR.showViz
+		VR.computeViz()
+</core>
+      <trig type="on_device" dev="keyboard" state="Pressed" param="" key="104" base_name="trigger" name_space="__global__" name_suffix="13" persistency="666"/>
+    </Script>
+    <Script base_name="mapECAD" group="dataFusion" name_space="__script__" name_suffix="0" persistency="666" server="server1" type="Python">
+      <core>
+	import VR
+	
+	def setComponentObj(component, obj):
+		component.geometry = obj
+		obj.addTag('ecadComponent')
+	
+	def getBestDiffMatch(s1, s2, Nmin):
+		if len(s1) &gt; len(s2): s1,s2 = s2,s1 # s1 is shorter
+				
+		def getSubMatch(i,j):
+			k = 0
+			for c1 in s1[i:]:
+				if j+k &gt;= len(s2): break
+				c2 = s2[j+k]
+				if c1 == c2: k += 1
+				else: break
+			return s1[i:i+k]
+			
+		matches = []
+		for i,c1 in enumerate(s1):
+			for j,c2 in enumerate(s2):
+				if c1 == c2: 
+					match = getSubMatch(i,j) # TODO: optimiize by remove match from strings!
+					if len(match) &gt; 2: matches.append(match)
+					
+		if matches == []: return None
+		match = max(matches, key=len)
+		if len(match) &lt; Nmin: return None
+		return match
+	
+
+	# map components to geometries based on component name and mcadID as well as geometry name
+	for vrID, component in VR.components.items():
+		# check if component valid!
+		if not component.mcadID and not component.name:
+			print 'unidentifiable component:', component
+			continue
+	
+		key = '|'+component.mcadID + '|' + component.name + '|'
+		
+		# first try the simplest mapping!
+		for name, obj in VR.objectsByBaseName.items():
+			if obj.hasTag('ecadComponent'): continue
+			if component.mcadID and component.mcadID in name:
+				setComponentObj(component, obj)
+				break
+		
+		if not component.geometry:
+			for name, obj in VR.objectsByBaseName.items():
+				if obj.hasTag('ecadComponent'): continue
+				match = getBestDiffMatch(key, name, 11)
+				if match:
+					#print match 
+					#print '  ', len(match), 'KEY:', key, 'NAME:', name
+					setComponentObj(component, obj)
+					if not component.mcadID: component.mcadID = match
+				
+		#if not component.geometry:
+		#	print 'unmapped component:', component
+</core>
+    </Script>
+    <Script base_name="ontoPrint" group="tests" name_space="__script__" name_suffix="0" persistency="666" server="server1" type="Python">
+      <core>
+	import VR
+
+	blacklist = {}
+	blacklist['StaticComponent'] = False
+	blacklist['Path'] = True
+	blacklist['Quaterniond'] = True
+	blacklist['Vector'] = True
+	blacklist['Volume'] = True
+	blacklist['float'] = True
+	blacklist['int'] = True
+	blacklist['string'] = True
+	blacklist['Area'] = True
+	blacklist['Node'] = True
+	blacklist['NodeEntry'] = True
+	blacklist['AnalogInputModule'] = True
+	blacklist['AnalogOutputModule'] = True
+	blacklist['DigitalInputModule'] = True
+	blacklist['DigitalOutputModule'] = True
+	blacklist['PowerSupply'] = True
+	blacklist['Terminal'] = True
+	blacklist['RelayModule'] = True
+	blacklist['ControlTransformer'] = True
+	blacklist['CoolingDevice'] = True
+	blacklist['RelayModule'] = True
+	blacklist['ResistanceThermometer'] = True
+	blacklist['DoublePushbutton'] = True
+	blacklist['TemperingDevice'] = True
+	blacklist['TouchPanel'] = True
+	blacklist['DriveShaft'] = True
+	blacklist['Gear'] = True
+	blacklist['Plating'] = True
+	blacklist['Belt'] = True
+
+	def printConcept(c,o=''):
+		print o + c.getName()
+		for p in c.getProperties(False):
+			n = p.getName()
+			if n in blacklist: continue
+			print o + '   ' +  p.getName(), '(' + p.getType() + ')'
+	
+	pcMap = VR.onto.getChildrenMap()
+	
+	def traverseConcept(c,o=''):
+		n = c.getName()
+		if n in blacklist: 
+			if blacklist[n]: return
+		ID = c.getID()
+		printConcept(c,o)
+		if n in blacklist: return
+		if ID in pcMap:
+			for c2 in pcMap[ID]: traverseConcept(c2, o+' ')
+			
+		
+	thing = VR.onto.getConcept('Thing')
+	traverseConcept(thing)
+</core>
+    </Script>
+    <Script base_name="panelHandler" group="panel" name_space="__script__" name_suffix="0" persistency="666" server="server1" type="Python">
+      <core>
+	import VR
+	
+	m = dev.getMessage()
+	print 'got message', m
+	
+	v = m.split('|')
+
+	if v[0] == 'register':
+		if not hasattr(VR, 'clients'): VR.clients = {}
+		VR.clients[v[1]] = dev.getKey()
+		VR.configureHMI()
+		
+	if v[0] == 'press':
+		if not v[1] in VR.profinetVariables:
+			print 'argh'
+			return
+		VR.profinetVariables[v[1]].value = 1
+		
+	if v[0] == 'set' and v[1] == 'variable':
+		if not v[2] in VR.profinetVariables:
+			print 'argh'
+			return
+		VR.profinetVariables[v[2]].value = v[4]
+</core>
+      <trig type="on_device" dev="server1" state="Released" param="" key="-1" base_name="trigger" name_space="__global__" name_suffix="1" persistency="666"/>
+    </Script>
+    <Script base_name="panelInit" group="panel" name_space="__script__" name_suffix="0" persistency="666" server="server1" type="Python">
+      <core>
+	import VR
+	
+	if hasattr(VR, 'panel'): VR.panel.destroy()		
+	VR.panel = VR.Sprite('panel')
+	W, H = 0.15, 0.087
+	VR.panel.setSize(W, H)
+	VR.panel.webOpen('http://localhost:5500/panelSite', 800, W/H)
+	VR.panel.setTransform([0,0,0], [0,0,1], [0,-1,0])
+	VR.scene.addChild(VR.panel)
+	
+	touch = VR.getRoot().findAll('Touch Panel SIMATIC HMI TP700 COMFORT Gabler Nr.0500 104 21')[0]
+	pos = touch.getWorldFrom()
+	dir = touch.getWorldDir()
+	up = touch.getWorldUp()
+	
+	#print pos
+	pos = [pos[0]-float(0.01), pos[1], pos[2]]
+	dir = [dir[0]*float((-1)),dir[1]*float((-1)),dir[2]*float((-1))]
+	up = [up[0],up[1]*float((-1)),up[2]]
+	
+	VR.panel.setTransform(pos, dir, up) 
+	VR.panel.setSize(W, H)
+</core>
+    </Script>
+    <Script base_name="panelSite" group="panel" name_space="__script__" name_suffix="0" persistency="666" server="server1" type="HTML">
+      <core>
+&lt;!DOCTYPE html&gt;
+&lt;html&gt;
+
+&lt;head&gt;
+	&lt;style type="text/css"&gt;
+		body {
+			margin: 1vw;
+			text-align: center;
+			background: rgb(54, 59, 65);
+			color: #FFF;
+			font-family: "Tahoma";
+			font-size: 3vw;
+			display: flex;
+			flex-flow: column wrap;
+		}
+		
+		.header {
+			flex-wrap: wrap;
+			justify-content: space-between;
+		}
+		
+		.main {
+			flex-flow: row wrap;
+			justify-content: space-between;
+		}
+		
+		.footer {
+			justify-content: space-between;
+			flex-wrap: wrap;
+			position: fixed;
+			bottom: 1vw;
+			width: 98vw;
+		}
+		
+		button {
+			background-color: rgb(99, 101, 113);
+			border: 2vw;
+			border-radius: 0.5vw;
+			color: #FFF;
+			font-size: 2vw;
+			font-weight: bold;
+			width: 20vw;
+			height: 3vw;
+			margin: 0.5vw;
+		}
+
+		hr.redline {
+			border: 3px solid rgb(225, 0, 58);
+			width: 98vw;
+		}
+		
+		#numpad {
+			flex-flow: row wrap;
+			width: 40vw;
+			height: 40vh;
+			position: fixed;
+			left: 30vw;
+			top: 45vh;
+			z-index:1;
+		}
+
+		button.numbutton {
+			background-color: rgb(99, 101, 113);
+			color: #FFF;
+			width: 13vw;
+			height: 10vh;
+			margin: auto;
+			justify-content: center;
+			flex: 1 0 33.3333%;
+			border: 0.1vw solid rgb(71, 73, 87);
+			border-radius: 0.5vw;
+		}
+		
+		input {
+			width: 20vw;
+			font-size: 3vw;
+		}
+	&lt;/style&gt;
+	&lt;script type="text/javascript"&gt;
+		// websocket
+		var websocket = new WebSocket('ws://localhost:5500');
+		websocket.onopen = function() { send('register|hmi'); };
+		websocket.onerror = function(e) { ; };
+		websocket.onmessage = function(e) { if (e.data) handle(e.data); };
+		function send(m){ websocket.send(m); };
+		
+		// configuration data
+		var buttons = [];
+		var entries = [];
+		//var homebuttons = [];
+		
+		function handle(msg) {
+			data = JSON.parse(msg)
+			buttons = data['buttons'];
+			entries = data['entries'];
+			//homebuttons = data['homebuttons'];
+			rebuildOperationPannel();
+		}
+		
+		// clock
+		function startTime() {
+			var today = new Date();
+			var y = today.getFullYear();
+			var mo = today.getMonth()+1;
+			var d = today.getDate();
+			var h = today.getHours();
+			var ampm = h &gt;= 12 ? 'pm' : 'am';
+			h = h % 12;
+			h = h ? h : 12; // the hour '0' should be '12'
+			var m = today.getMinutes();
+			m &lt; 10 ? m = "0" + m : m;
+			var s = today.getSeconds();
+			s &lt; 10 ? s = "0" + s : s;
+			document.getElementById('clock1').innerHTML =  d + "/" +mo + "/" + y + " " + h + ":" + m + ":" + s + " " + ampm;
+			document.getElementById('clock2').innerHTML =  d + "/" +mo + "/" + y + " " + h + ":" + m + ":" + s + " " + ampm;
+			document.getElementById('clock3').innerHTML =  d + "/" +mo + "/" + y + " " + h + ":" + m + ":" + s + " " + ampm;
+			var t = setTimeout(startTime, 1000); //if not working right, set to '500'
+		}
+	
+		// numpad
+		var focusedInput = "";
+
+		function focusInput(input) {
+			focusedInput = input;
+			document.getElementById("numpad").style.display = 'flex'; //show Numpad
+		}
+
+		function numpadClear() {
+			focusedInput.value = "";
+		}
+
+		function numpadEnter() {
+			send('set|variable|'+focusedInput.id+'|to|'+focusedInput.value);
+			document.getElementById("numpad").style.display = 'none'; //hide Numpad
+		}
+
+		function numpadNum(x) {
+			focusedInput.value += x;
+		}
+
+		// navigation
+		var currentTab = null;
+
+		function openTab(tabID) {
+			var h = document.getElementById('header')
+			for (var i = 0; i &lt; h.children.length; i++) h.children[i].style.display = 'none';
+			var t = document.getElementById('main')
+			for (var i = 0; i &lt; h.children.length; i++) t.children[i].style.display = 'none';
+			var f = document.getElementById('footer')
+			for (var i = 0; i &lt; f.children.length; i++) f.children[i].style.display = 'none';
+		
+			var header = 'header'+tabID;
+			var main = 'main'+tabID;
+			var footer = 'footer'+tabID;
+			document.getElementById(header).style.display = 'flex';
+			document.getElementById(main).style.display = 'flex';
+			document.getElementById(footer).style.display = 'flex';	
+			document.getElementById("numpad").style.display = 'none'; //hide Numpad
+		}
+		
+		// operation
+		function buttonPress(Name) {
+			send('press|'+Name);
+		}
+
+		// configuration		
+		function addButton(value, index, array) {
+			var pannel = document.getElementById("main2");
+			var button = document.createElement('button');
+			button.id = value;
+			button.innerHTML = value;
+			button.onclick = function() { buttonPress(button.innerHTML) };
+			//button.onclick = function() { buttonPress(value) };
+			pannel.appendChild(button);
+		}
+		
+		function addEntry(value, index, array) {
+			var pannel = document.getElementById("main2");
+			var entry = document.createElement('input');
+			entry.id = value['name'];
+			entry.value = value['startValue'];
+			entry.onfocus = function() { focusInput(this) };
+			pannel.appendChild(entry);
+			var entryId = document.createTextNode(entry.id);
+			pannel.appendChild(entryId);
+		}
+		
+		/*to generate whole HMI panel
+		function addHomeButton(value, index, array) {
+			var pannel = document.getElementById("main4");
+			var homebutton = document.createElement('button');
+			button.innerHTML = value;
+			button.onclick = function() { buttonPress(button.innerHTML) };
+			pannel.appendChild(button);
+		}*/
+		
+		function clearPannel() {
+			var pannel = document.getElementById("main2");
+			while (pannel.firstChild) pannel.removeChild(pannel.firstChild);
+		}
+		
+		function rebuildOperationPannel() {
+			clearPannel();
+			buttons.forEach(addButton);
+			entries.forEach(addEntry);
+			//homebuttons.forEach(addHomeButton);
+		}
+		
+		function init() {
+			openTab('1');
+			startTime();
+			rebuildOperationPannel();
+		}
+	&lt;/script&gt; 
+&lt;/head&gt;
+
+&lt;body onload="init()"&gt;
+	&lt;header id="header"&gt;
+		&lt;div class='header' id="header1"&gt;
+			&lt;div id="clock1"&gt;&lt;/div&gt;
+		&lt;/div&gt;
+		&lt;div class='header' id="header2"&gt;
+			&lt;button onclick="openTab('1')"&gt;Home&lt;/button&gt;
+			&lt;div id="clock2"&gt;&lt;/div&gt;
+			&lt;button onclick="openTab('3')"&gt;Config&lt;/button&gt;
+			&lt;hr class="redline"&gt;
+		&lt;/div&gt;
+		
+		&lt;div class='header' id="header3"&gt;
+			&lt;button onclick="openTab('1')"&gt;Home&lt;/button&gt;
+			&lt;div id="clock3"&gt;&lt;/div&gt;
+			&lt;button onclick="openTab('3')"&gt;Config&lt;/button&gt;
+			&lt;hr class="redline"&gt;
+		&lt;/div&gt;
+	&lt;/header&gt;
+	&lt;div id="main"&gt;
+		&lt;div class="main" id="main1"&gt;
+		&lt;p&gt;KVE-120 &lt;br&gt;Extrution System&lt;/p&gt;
+		&lt;/div&gt;
+		&lt;div class="main" id="main2"&gt;&lt;/div&gt;
+		&lt;div class="main" id="main3"&gt;
+			bla
+			&lt;input id="allowStartLiq" onfocus="focusInput(this)"&gt;&lt;/input&gt;					
+			Temp. to Allow Start Liquid Filling (C)
+		&lt;/div&gt;
+	&lt;/div&gt;
+	&lt;footer id="footer" class="footer"&gt;
+		&lt;div class="footer" id="footer1"&gt;
+			&lt;hr class="redline"&gt;
+			&lt;button&gt;English&lt;/button&gt;
+			&lt;button onclick="openTab('2')"&gt;Extruder menu&lt;/button&gt;
+		&lt;/div&gt;
+		&lt;div class="footer" id="footer2"&gt;
+			&lt;hr class="redline"&gt;
+			&lt;button&gt;E-Stop&lt;/button&gt;
+			&lt;button&gt;Ack Alarms&lt;/button&gt;
+		&lt;/div&gt;
+		&lt;div class="footer" id="footer3"&gt;
+			&lt;hr class="redline"&gt;
+			&lt;button onclick="openTab('2')"&gt;Extruder menu&lt;/button&gt;
+		&lt;/div&gt;
+	&lt;/footer&gt;
+	
+	&lt;div id="numpad"&gt;
+		&lt;button class="numbutton" onclick="numpadNum(1)"&gt;1&lt;/button&gt;
+		&lt;button class="numbutton" onclick="numpadNum(2)"&gt;2&lt;/button&gt;
+		&lt;button class="numbutton" onclick="numpadNum(3)"&gt;3&lt;/button&gt;
+		&lt;button class="numbutton" onclick="numpadNum(4)"&gt;4&lt;/button&gt;
+		&lt;button class="numbutton" onclick="numpadNum(5)"&gt;5&lt;/button&gt;
+		&lt;button class="numbutton" onclick="numpadNum(6)"&gt;6&lt;/button&gt;
+		&lt;button class="numbutton" onclick="numpadNum(7)"&gt;7&lt;/button&gt;
+		&lt;button class="numbutton" onclick="numpadNum(8)"&gt;8&lt;/button&gt;
+		&lt;button class="numbutton" onclick="numpadNum(9)"&gt;9&lt;/button&gt;
+		&lt;button class="numbutton" onclick="numpadNum(0)"&gt;0&lt;/button&gt;
+		&lt;button class="numbutton" onclick="numpadClear()"&gt;clear&lt;/button&gt;
+		&lt;button class="numbutton" onclick="numpadEnter()"&gt;enter&lt;/button&gt;
+	&lt;/div&gt;
+&lt;/body&gt;
+
+&lt;/html&gt;
+</core>
+    </Script>
+    <Script base_name="parametrizeKinematics" group="simulation" name_space="__script__" name_suffix="0" persistency="666" server="server1" type="Python">
+      <core>
+	import VR
+	from VR.Math import Vec3
+	
+	def printPose(p):
+		print p.pos(), p.dir(), p.up(), p.scale()
+	
+	if hasattr(VR, 'gearViz'): VR.gearViz.destroy()
+	VR.gearViz = VR.AnalyticGeometry()
+	VR.gearViz.setLabelParams(0.02, True, True, [0,0,0,1], [1,1,1,1], [0.0,0,0.0])
+	VR.scene.addChild(VR.gearViz)
+
+	if hasattr(VR, 'kinematicSim'): VR.kinematicSim.clear()
+	else: VR.kinematicSim = VR.Kinematics()
+	
+	VR.setPhysicsActive(0)
+	
+	def getJointOffset(a,b):
+		p = a.getPoseTo(b)
+		s = a.getWorldScale()[0]
+		p = VR.Pose(p.pos()*s, p.dir(), p.up(), p.scale())
+		return p
+	
+	gear1 = VR.gearToMotorGear
+	axis1 = VR.scene.findAll('4507 008 11 Antriebswelle KV-120')[0]
+	gear2 = VR.scene.findAll('4507 013 03 Zahnrad f. Getr. KV-120')[0]
+	
+	p0 = VR.Pose()
+	p1 = getJointOffset(gear1, axis1)
+	p2 = getJointOffset(gear2, axis1)
+	
+	a1ID  = VR.kinematicSim.addBody(axis1)
+	g1ID = VR.kinematicSim.addBody(gear1)
+	g2ID = VR.kinematicSim.addBody(gear2)
+	VR.kinematicSim.addFixedJoint(a1ID, g1ID, p0, p1)
+	VR.kinematicSim.addFixedJoint(a1ID, g2ID, p0, p2)
+	
+	axis2 = VR.scene.findAll('4507 011 02 Antriebswelle KV 120')[0]
+	axis3 = VR.scene.findAll('4507 341 03 Zahnradwelle m=2, z=22 f. KV-120')[1]
+	gear3 = VR.scene.findAll('4507 015 03 zahnrad')[0]
+	gear4 = VR.scene.findAll('4507 014 03 Zahnrad m=5 z=27 KV-120')[1]
+
+	
+	p3 = getJointOffset(gear3, axis2)
+	p4 = getJointOffset(gear4, axis2)
+	p5 = getJointOffset(axis3, axis2)
+	
+	a2ID  = VR.kinematicSim.addBody(axis2)
+	a3ID  = VR.kinematicSim.addBody(axis3)
+	g3ID = VR.kinematicSim.addBody(gear3)
+	g4ID = VR.kinematicSim.addBody(gear4)
+	VR.kinematicSim.addFixedJoint(a2ID, g3ID, p0, p3)
+	VR.kinematicSim.addFixedJoint(a2ID, g4ID, p0, p4)
+	VR.kinematicSim.addFixedJoint(a2ID, a3ID, p0, p5)
+	
+	
+	axis4 = VR.scene.findAll('4507 012 02 Antriebswelle KV 120')[0]
+	axis5 = VR.scene.findAll('4507 341 03 Zahnradwelle m=2, z=22 f. KV-120')[0]
+	gear5 = VR.scene.findAll('4507 016 03 Zahnrad f. Getr. KV-120')[0]
+	gear6 = VR.scene.findAll('4507 014 03 Zahnrad m=5 z=27 KV-120')[0]
+
+	
+	p6 = getJointOffset(gear5, axis4)
+	p7 = getJointOffset(gear6, axis4)
+	p8 = getJointOffset(axis5, axis4)
+	
+	a4ID  = VR.kinematicSim.addBody(axis4)
+	a5ID  = VR.kinematicSim.addBody(axis5)
+	g5ID = VR.kinematicSim.addBody(gear5)
+	g6ID = VR.kinematicSim.addBody(gear6)
+	VR.kinematicSim.addFixedJoint(a4ID, g5ID, p0, p6)
+	VR.kinematicSim.addFixedJoint(a4ID, g6ID, p0, p7)
+	VR.kinematicSim.addFixedJoint(a4ID, a5ID, p0, p8)
+
+	print 'init kinematics done'
+	VR.setPhysicsActive(1)
+
+
+		
+	"""
+	#VR.gearViz.addVector(pwAo.pos(), [0,0.4,0], [1,1,0], 'axis geometric center')
+	#VR.gearViz.addVector(pwGo.pos(), [0,0.4,0], [1,1,0], 'gear geometric center')
+	VR.gearViz.addVector(pwA.pos(), [0,0.35,0], [1,1,0], 'axis origin')
+	VR.gearViz.addVector(pwG.pos(), [0,0.4,0], [1,1,0], 'gear origin')
+	VR.gearViz.addVector(pwG.multRight(p1).pos(), [0,0.45,0], [0,1,0], 'joint in gear')
+	VR.gearViz.addVector(pwA.multRight(VR.Pose()).pos(), [0,0.5,0], [0,0,1], 'joint in axis')
+	"""
+</core>
+      <trig type="on_device" dev="keyboard" state="Pressed" param="" key="107" base_name="trigger" name_space="__global__" name_suffix="16" persistency="666"/>
+    </Script>
+    <Script base_name="parametrizeMechanism" group="simulation" name_space="__script__" name_suffix="0" persistency="666" server="server1" type="Python">
+      <core>
+	import VR, string
+
+	if hasattr(VR, 'mechanismSim'): VR.mechanismSim.destroy()	
+	VR.mechanismSim = VR.Mechanism()
+	VR.mechanismSim.clear()
+	VR.scene.addChild(VR.mechanismSim)
+	
+	def addGear(gear):
+		e = gear.getEntity()
+		width = 20
+		radius = e.get('radius')
+		hole = e.get('hole')
+		pitch = e.get('pitch')
+		Nteeth = e.get('Nteeth')
+		teeth_size = 0.01
+		bevel = 0
+		gear.addTag('gear')
+		print Nteeth
+		#VR.mechanismSim.addGear(gear, width, hole, pitch, N_teeth, teeth_size, bevel)
+		VR.mechanismSim.addGear(gear, width, hole, 0.02*1000, 32, 0.01*1000, 0, [-1,0,0])
+		#VR.mechanismSim.addGear(gear, 0.02*1000, 0.01*1000, 0.02*1000, 32, 0.01*1000, 0, [-1,0,0])
+	
+	"""
+	for gearEnt in VR.onto.getEntities('Gear'):
+		gear = gearEnt.getSGObject()
+		addGear(gear)
+	"""
+	
+	gear0 = VR.motorGear
+	gear1 = VR.gearToMotorGear
+	addGear(gear0)
+	addGear(gear1)
+	c = VR.mechanismSim.addChain(0.02, [gear0, gear1], 'll')
+	VR.mechanismSim.addChild(c)
+
+	VR.mechanismSim.updateNeighbors()
+	VR.mechanismSim.updateVisuals()
+</core>
+    </Script>
+    <Script base_name="pcaAnalysis" group="kinematics" name_space="__script__" name_suffix="0" persistency="666" server="server1" type="Python">
+      <core>
+	import VR
+	from VR.Math import Vec3
+	
+	#obj = VR.machine.findAll('4507 372 03 Kettenrad kpl.z=23 t=1\' Bg=60')[0]
+	
+	s = VR.Selector()
+	s.select(obj, 1, 1)
+	pca = s.getSelection().computePCA()
+	s.deselect()
+	
+	a = pca.pos()[0]
+	b = pca.pos()[1]
+	c = pca.pos()[2]
+	
+	D, R1, R2 = pca.up(), pca.x(), pca.dir()
+	AB,AC,BC = abs(a-b), abs(a-c), abs(b-c)
+	if AC &lt; AB and AC &lt; BC: D, R1, R2 = pca.x(), pca.up(), pca.dir()
+	if BC &lt; AB and BC &lt; AC: D, R1, R2 = pca.dir(), pca.x(), pca.up()
+	
+	D.normalize()
+	return D, R1, R2
+</core>
+      <arg type="NoneType" value="None" base_name="obj" name_space="pcaAnalysis" name_suffix="0" persistency="666"/>
+    </Script>
+    <Script base_name="populateOntology" group="semanticLayer" name_space="__script__" name_suffix="0" persistency="666" server="server1" type="Python">
+      <core>
+	import VR
+
+	VR.classification = {}
+	
+	def getMatchingConcept(name):
+		if not name: return 'ElectricalComponent'	
+		for D,vE in VR.terminology.items():
+			E = vE[0]
+			if D.lower() in name.lower() or E.lower() in name.lower():
+				return E
+	
+	def classify(obj): # classify each object
+		name = obj.getName()
+		cl = getMatchingConcept(name)
+		if cl: VR.classification[obj] = cl
+		
+	def classifyObjects():
+		def traverse(obj):
+			classify(obj)	
+			for child in obj.getChildren(): traverse(child)
+		traverse(VR.machine)
+		
+	def checkAncestry(obj, cl):
+		for a in obj.getAncestry():
+			if a in VR.classification:
+				if VR.classification[a] == cl: return True
+		return False
+	
+	def checkPopulation():# get unclassified components
+		for ID, component in VR.components.items():
+			if component.entity: continue
+			print 'unclassified component:', component
+			
+		for ID, component in VR.components.items():
+			for connection in component.connections:
+				if connection.entity: continue
+				print 'unclassified connection:', connection
+				
+			for name,port in component.ports.items():
+				if port.entity: continue
+				print 'unclassified port:', component.ecadID, component.name, port
+				
+	def populateObjects():
+		for obj, cl in VR.classification.items():
+			if checkAncestry(obj, cl): continue
+			name = obj.getName()
+			e = VR.onto.addEntity(name, cl)
+			obj.setEntity(e)
+			e.setSGObject(obj)
+			obj.setPickable(True)	
+			
+	def populateConnection(connection): # TODO: extend if necessary!
+		e = VR.onto.addEntity(connection.label, 'Wire')
+		e.set('label', connection.label)
+		connection.entity = e
+		
+	def populatePort(component, port):
+		portEnt = VR.onto.addEntity(port.name, 'Port')
+		portEnt.set('label', port.name)
+		component.entity.add('port', portEnt.getName())
+		port.entity = portEnt
+		if port.connection:
+			if not port.connection.entity: populateConnection(port.connection)
+			wireEnt = port.connection.entity
+			portEnt.set('wire', wireEnt.getName())
+			
+	def populateComponents():	# further unclassified ecad components
+		for ID, component in VR.components.items():
+			if component.geometry: component.entity = component.geometry.getEntity()
+			if not component.entity:
+				cl = getMatchingConcept(component.name)
+				if cl:
+					component.entity = VR.onto.addEntity(component.name, cl)
+					if component.geometry: component.geometry.setEntity(component.entity)
+	
+			# TODO: populate ports and wires
+			if component.entity:
+				if not component.entity.is_a('ElectricalComponent'): continue
+				for name, port in component.ports.items():
+					populatePort(component, port)
+	
+	VR.setupTaxonomy()
+	classifyObjects()
+	populateObjects()
+	populateComponents()
+	checkPopulation()
+			 
+	for e in VR.onto.getEntities('Switch'):
+		e.set('state', 'unpressed')
+		
+	for e in VR.onto.getEntities('DoublePushbutton'):
+		e.set('state', 'unpressed', 0)
+		e.set('state', 'unpressed', 1)
+		
+		
+		
+	
+</core>
+    </Script>
+    <Script base_name="release" group="no group" name_space="__script__" name_suffix="0" persistency="666" server="server1" type="Python">
+      <core>
+	import VR
+
+	for e in VR.onto.getEntities('DoublePushbutton'):
+		e.set('state', 'unpressed', 0)
+		e.set('state', 'unpressed', 1)
+
+	VR.simECAD()
+</core>
+      <trig type="on_device" dev="mouse" state="Released" param="" key="-1" base_name="trigger" name_space="__global__" name_suffix="11" persistency="666"/>
+    </Script>
+    <Script base_name="sendHMI" group="panel" name_space="__script__" name_suffix="0" persistency="666" server="server1" type="Python">
+      <core>
+	import VR
+	
+	if not hasattr(VR, 'clients'): return
+	clientID = VR.clients[client]
+	VR.find('server1').answer(clientID, msg)
+
+	
+</core>
+      <arg type="NoneType" value="None" base_name="client" name_space="sendHMI" name_suffix="0" persistency="666"/>
+      <arg type="NoneType" value="None" base_name="msg" name_space="sendHMI" name_suffix="0" persistency="666"/>
+    </Script>
+    <Script base_name="setupTaxonomy" group="semanticLayer" name_space="__script__" name_suffix="0" persistency="666" server="server1" type="Python">
+      <core>
+	import VR
+	
+	#classify component types
+	
+	# TODO: alle ECAD componenten die primär den strom durchlassen erben von der selben klasse
+	
+	VR.terminology = {}
+	
+	# electrical components
+	VR.terminology['MOE'] = ['Fuse', 'ConnectorComponent']
+	VR.terminology['Elektronische Absicherung'] = ['Fuse', 'ConnectorComponent']
+	VR.terminology['klemme'] = ['Terminal', 'ConnectorComponent']
+	VR.terminology['Relaismodul'] = ['RelayModule', 'ConnectorComponent']
+	VR.terminology['Steuertransformator'] = ['ControlTransformer', 'ElectricalComponent']
+	VR.terminology['Schalter'] = ['Switch', 'ElectricalComponent']
+	VR.terminology['Doppeldrucktaste'] = ['DoublePushbutton', 'Switch']
+	VR.terminology['touch panel'] = ['TouchPanel', 'ElectricalComponent']
+	VR.terminology['Temperiergerät'] = ['TemperingDevice', 'ElectricalComponent']
+	VR.terminology['Netzgerät'] = ['PowerSupply', 'ConnectorComponent']
+	VR.terminology['PILZ.PNOZ'] = ['SafetyRelay', 'ElectricalComponent']
+	VR.terminology['LAPP.ÖLFLEX'] = ['DataCable', 'Cable']
+	VR.terminology['TOPSERV'] = ['DataCable', 'Cable']
+	VR.terminology['widerstandsthermometer'] = ['ResistanceThermometer', 'ElectricalComponent']
+	VR.terminology['kühlgerät'] = ['CoolingDevice', 'ElectricalComponent']
+	
+	VR.terminology['HAR'] = ['Housing', 'ElectricalComponent']
+	
+	# automation modules
+	VR.terminology['CPU'] = ['PLC', 'AutomationModule']
+	VR.terminology['SIE.Sinamics'] = ['FrequencyConverter', 'AutomationModule']
+	VR.terminology['SIE.ET200SP AE'] = ['AnalogInputModule', 'AutomationModule']
+	VR.terminology['SIE.ET200SP AO'] = ['AnalogOutputModule', 'AutomationModule']
+	VR.terminology['SIE.ET200SP DE'] = ['DigitalInputModule', 'AutomationModule']
+	VR.terminology['SIE.ET200SP DA'] = ['DigitalOutputModule', 'AutomationModule']
+	
+	# kinematic components
+	VR.terminology['antriebswelle'] = ['DriveShaft', 'KinematicComponent']
+	VR.terminology['kettenrad'] = ['Sprocket', 'KinematicComponent']
+	VR.terminology['motor'] = ['Engine', 'KinematicComponent']
+	VR.terminology['platte'] = ['Plating', 'KinematicComponent']
+	VR.terminology['riemen'] = ['Belt', 'KinematicComponent']
+	VR.terminology['zahnrad'] = ['Gear', 'KinematicComponent']
+	VR.terminology['kettenrad'] = ['Gear', 'KinematicComponent']
+	
+	# static components
+	VR.terminology['buchse'] = ['Bush', 'StaticComponent']
+	VR.terminology['abdeckscheibe'] = ['CoverPlate', 'StaticComponent']
+	VR.terminology['abscherstift'] = ['ShearPin', 'StaticComponent']
+	VR.terminology['augenschraube'] = ['Eyebolt', 'StaticComponent']
+	VR.terminology['axial-pendelrollenlager'] = ['SphericalRollerThrustBearings', 'StaticComponent']
+	VR.terminology['betaetigungseinsatz'] = ['ActivityUse', 'StaticComponent']
+	VR.terminology['blockierhebel'] = ['BlockingLever', 'StaticComponent']
+	VR.terminology['bolzen'] = ['Bolts', 'StaticComponent']
+	VR.terminology['buegelgriff'] = ['IronGrip', 'StaticComponent']
+	VR.terminology['deckblech'] = ['CoverSheet', 'StaticComponent']
+	VR.terminology['deckel'] = ['Cover', 'StaticComponent']
+	VR.terminology['deckscheibe'] = ['CoverDisc', 'StaticComponent']
+	VR.terminology['distanzbuchse'] = ['DistanceBush', 'StaticComponent']
+	VR.terminology['distanzring'] = ['DistanceRing', 'StaticComponent']
+	VR.terminology['doppelnippel-rohr'] = ['DoubleNipplePipe', 'StaticComponent']
+	VR.terminology['doppelnippel'] = ['DoubleNipple', 'StaticComponent']
+	VR.terminology['einschraubstutzen'] = ['ScrewedSocket', 'StaticComponent']
+	VR.terminology['entlueftungsschraube'] = ['VentScrew', 'StaticComponent']
+	VR.terminology['frontplatte'] = ['FrontPanel', 'StaticComponent']
+	VR.terminology['funktionsmutter'] = ['FunctionalNut', 'StaticComponent']
+	VR.terminology['gehaeuse'] = ['Casing', 'StaticComponent']
+	VR.terminology['gekröpftes glied'] = ['BentLimb', 'StaticComponent']
+	VR.terminology['gekroepftes glied'] = ['BentLimb', 'StaticComponent']
+	VR.terminology['getriebedeckel'] = ['GearboxCover', 'StaticComponent']
+	VR.terminology['getriebegehaeuse'] = ['Gearbox', 'StaticComponent']
+	VR.terminology['gewindestift'] = ['SetScrew', 'StaticComponent']
+	VR.terminology['gitterkanal'] = ['LatticeChannel', 'StaticComponent']
+	VR.terminology['gleitstein'] = ['SlidingStick', 'StaticComponent']
+	VR.terminology['glykodur-buchse'] = ['GlycodurSocket', 'StaticComponent']
+	VR.terminology['grundplatte'] = ['Baseplate', 'StaticComponent']
+	VR.terminology['haltewinkel'] = ['Bracket', 'StaticComponent']
+	VR.terminology['hydraulikzylinder'] = ['HydraulicCylinders', 'StaticComponent']
+	VR.terminology['imbusschluessel'] = ['AllenWrench', 'StaticComponent']
+	VR.terminology['kappe'] = ['Cap', 'StaticComponent']
+	VR.terminology['kettenschloss'] = ['ChainLock', 'StaticComponent']
+	VR.terminology['kettenspannbox'] = ['ChainTensioningDevice', 'StaticComponent']
+	VR.terminology['kippung'] = ['Tilt', 'StaticComponent']
+	VR.terminology['lagerbuchse'] = ['BearingBush', 'StaticComponent']
+	VR.terminology['lagerdeckel'] = ['BearingCover', 'StaticComponent']
+	VR.terminology['lagerplatte'] = ['BearingPlate', 'StaticComponent']
+	VR.terminology['Logo'] = ['Logo', 'StaticComponent']
+	VR.terminology['magnetventil'] = ['MagnetivValve', 'StaticComponent']
+	VR.terminology['manometer'] = ['Manometer', 'StaticComponent']
+	VR.terminology['nadellager'] = ['NeedleRollerBearings', 'StaticComponent']
+	VR.terminology['nutmutter'] = ['Locknut', 'StaticComponent']
+	VR.terminology['oelschauglas'] = ['OilInspectionGlass', 'StaticComponent']
+	VR.terminology['passfeder'] = ['AdjustingSpring', 'StaticComponent']
+	VR.terminology['passscheibe'] = ['SuitableDisc', 'StaticComponent']
+	VR.terminology['presshuelse'] = ['Ferrule', 'StaticComponent']
+	VR.terminology['pressnippel'] = ['PressNipple', 'StaticComponent']
+	VR.terminology['radialwellendichtring'] = ['RadialShaftSeal', 'StaticComponent']
+	VR.terminology['rillenkugellager'] = ['DeepGrooveBallBearings', 'StaticComponent']
+	VR.terminology['rohr'] = ['Pipe', 'StaticComponent']
+	VR.terminology['rollenkette'] = ['RollerChain', 'StaticComponent']
+	VR.terminology['rueckschlagventil'] = ['CheckValve', 'StaticComponent']
+	VR.terminology['runddichtring'] = ['AroundSealingRing', 'StaticComponent']
+	VR.terminology['schaftschraube'] = ['CommunityScrew', 'StaticComponent']
+	VR.terminology['schalterplatte'] = ['Switchplate', 'StaticComponent']
+	VR.terminology['schaltgabel'] = ['ShiftFork', 'StaticComponent']
+	VR.terminology['schaltkurve'] = ['SwitchingCurve', 'StaticComponent']
+	VR.terminology['schaltwelle'] = ['SwitchingShaft', 'StaticComponent']
+	VR.terminology['scharnier'] = ['Hinge', 'StaticComponent']
+	VR.terminology['scheibe'] = ['Disc', 'StaticComponent']
+	VR.terminology['schlauchnippel'] = ['HoseNipple', 'StaticComponent']
+	VR.terminology['schmutzfaenger'] = ['Mudflap', 'StaticComponent']
+	VR.terminology['schnellkupplung'] = ['QuickCoupling', 'StaticComponent']
+	VR.terminology['schraegkugellager'] = ['AngularContactBallBearings', 'StaticComponent']
+	VR.terminology['sechskantmutter'] = ['HexagonNut', 'StaticComponent']
+	VR.terminology['sechskantschraube'] = ['HexBolt', 'StaticComponent']
+	VR.terminology['seitenwand'] = ['SidePanel', 'StaticComponent']
+	VR.terminology['senkbremsventil'] = ['LoweringValve', 'StaticComponent']
+	VR.terminology['senkschraube'] = ['CountersunkScrew', 'StaticComponent']
+	VR.terminology['sicherungsblech'] = ['SecuritySheet', 'StaticComponent']
+	VR.terminology['sicherungsring'] = ['Circlip', 'StaticComponent']
+	VR.terminology['standschrank'] = ['StandingCabinet', 'StaticComponent']
+	VR.terminology['steckverschraubung'] = ['Push', 'StaticComponent']
+	VR.terminology['stellfuss'] = ['DeputyFoot', 'StaticComponent']
+	VR.terminology['stopfen'] = ['Plug', 'StaticComponent']
+	VR.terminology['typenschild'] = ['TypePlate', 'StaticComponent']
+	VR.terminology['ueberwurfmutter'] = ['UnionNut', 'StaticComponent']
+	VR.terminology['unterlegscheibe'] = ['Washer', 'StaticComponent']
+	VR.terminology['verschlusskupplung'] = ['ReleaseCoupling', 'StaticComponent']
+	VR.terminology['verschlussschraube'] = ['Screw', 'StaticComponent']
+	VR.terminology['verschraubung'] = ['Gland', 'StaticComponent']
+	VR.terminology['vorreiber'] = ['SashLock', 'StaticComponent']
+	VR.terminology['winkel'] = ['Elbow', 'StaticComponent']
+	VR.terminology['zentrierbolzen'] = ['AlignmentBolt', 'StaticComponent']
+	VR.terminology['zunge'] = ['Tongue', 'StaticComponent']
+	VR.terminology['zylinderrollenlager'] = ['CylindricRollerBearings', 'StaticComponent']
+	VR.terminology['zylinderschraube'] = ['CylinderHeadScrew', 'StaticComponent']
+	VR.terminology['zylinderstift'] = ['CylinderPin', 'StaticComponent']
+	
+	
+	VR.onto = VR.Ontology('CADVR')
+	VR.onto.addModule('Object')
+
+	#add concepts
+	VR.onto.addConcept('Component', 'Object')
+	VR.onto.addConcept('MechanicalComponent', 'Component')
+	VR.onto.addConcept('KinematicComponent', 'MechanicalComponent')
+	VR.onto.addConcept('StaticComponent', 'MechanicalComponent')
+	Wire = VR.onto.addConcept('Wire')
+	Wire.addProperty('current', 'float')
+	Wire.addProperty('label', 'string')
+	Port = VR.onto.addConcept('Port')
+	Port.addProperty('wire', 'Wire')
+	Port.addProperty('current', 'float')
+	Port.addProperty('label', 'string')
+	ElectricalComponent = VR.onto.addConcept('ElectricalComponent', 'Component')
+	ElectricalComponent.addProperty('port', 'Port')
+	VR.onto.addConcept('AutomationModule', 'ElectricalComponent')
+	VR.onto.addConcept('ConnectorComponent', 'ElectricalComponent')
+	VR.onto.addConcept('Cable','ConnectorComponent')
+	VR.onto.addConcept('Engine','ElectricalComponent')
+	VR.onto.addConcept('PowerCable','Cable')
+	Switch = VR.onto.addConcept('Switch','ElectricalComponent')
+	Switch.addProperty('state', 'bool')
+	DoublePushbutton = VR.onto.addConcept('DoublePushbutton','Switch')
+	
+	
+	
+	for D,vE in VR.terminology.items():
+		name = vE[0]
+		parents = vE[1:]
+		if not VR.onto.getConcept(name):
+			concept = VR.onto.addConcept(name, parents[0])
+			for parent in parents[1:]: parent.append(concept)
+			
+	Gear = VR.onto.getConcept('Gear')
+	Gear.addProperty('axis', 'Direction')
+	Gear.addProperty('radius', 'float')
+	Gear.addProperty('hole', 'float')
+	Gear.addProperty('pitch', 'float')
+	Gear.addProperty('Nteeth', 'int')
+	
+	
+	
+	
+</core>
+    </Script>
+    <Script base_name="simECAD" group="simulation" name_space="__script__" name_suffix="0" persistency="666" server="server1" type="Python">
+      <core>
+	import VR, random
+	
+	for k,component in VR.components.items(): # reset current
+		for p,c in component.ports.items(): component.setCurrent('0',p)
+		for connection in component.connections: connection.entity.set('current', '0')
+	
+	L = VR.componentIDs['=KVE120+-XPWR'][0]
+	L.setCurrent('1', '0')
+	
+	stack = [L]
+	
+	R = random.random()
+	
+	def propagateConnection(component, connection, stack, debug = 1):
+		if not connection: return
+		if debug: connection.entity.set('current', '1')
+		
+		target = connection.getOther(component)
+		components = VR.componentIDs[target.ecadID]
+		stack += components
+		for c in components: c.setCurrent('1',target.port)
+	
+	def propagate(component, stack, debug):
+		for connection in component.connections:
+			propagateConnection(component, connection, stack, debug)
+	
+	while len(stack) &gt; 0:
+		component = stack[-1]
+		del stack[-1]
+		
+		# set processed flag, sure about that?
+		if component.flag == R: continue
+		component.flag = R
+		
+		# get entity
+		e = component.entity
+		if not e: continue
+		
+		en = e.getName()
+		
+		if e.is_a('ConnectorComponent'):
+			# check for port 0 and 1 if 
+			"""
+			portEnts = VR.onto.process('q(x):Port(x);ConnectorComponent('+en+');has('+en+',x);is(x.label,0)')
+			for portEnt in portEnts:
+				portEnt.set('current','1')
+				wire = portEnt.get('wire')
+				wire.set('current','1')
+			"""
+			propagate(component, stack, 1)
+		
+		
+		#q = 'q(x) : DoublePushbutton('+e.getName()+') ; is('+e.getName()+'.state[0], unpressed) ; is('+e.getName()+'.state[1], pressed)'
+		
+		if e.is_a('DoublePushbutton'):
+			if e.get('state', 0) == 'unpressed': # reversed switch
+				propagateConnection(component, component.getConnection('1'), stack)
+				propagateConnection(component, component.getConnection('2'), stack)
+			if e.get('state', 1) == 'pressed':
+				propagateConnection(component, component.getConnection('3'), stack)
+				propagateConnection(component, component.getConnection('4'), stack)
+			continue
+		
+		if e.is_a('Switch'):
+			#q = 'q(x) : Switch('+e.getName()+') ; is('+e.getName()+'.state, unpressed)'
+			if e.get('state') == 'pressed': propagate(component, stack, 1)
+				
+				
+		
+	VR.computeViz()
+		
+</core>
+      <trig type="none" dev="" state="Pressed" param="0" key="0" base_name="trigger" name_space="__global__" name_suffix="6" persistency="666"/>
+    </Script>
+    <Script base_name="simKinematics" group="simulation" name_space="__script__" name_suffix="0" persistency="666" server="server1" type="Python">
+      <core>
+	import VR
+	
+
+	#return
+	if hasattr(VR, 'P2'): VR.P2.rotate(0.005, [0,0,1])
+	if hasattr(VR, 'motorGear'): VR.motorGear.rotate(0.01, [0,0,1])
+	
+	if not 'MD_SP' in VR.profinetVariables: return
+
+	speed = float(VR.profinetVariables['MD_SP'].value)*0.001
+	doRun = bool (VR.profinetVariables['Prc_Cmd_Start_Ext'].value)
+	
+	if not doRun: speed = 0
+	
+	if 1: # mock up
+		gear = VR.engineMockUp.getChild(2)
+		gear.rotate(speed,[0,0,1])
+		t = speed/30
+		m = VR.Material()
+		m.setDiffuse([1-t,t,0])
+		gear.setMaterial(m)
+	
+
+	# main engine
+	#g = VR.motorGear
+	#g = VR.gearToMotorGear	
+	gears = [VR.machine.findAll('4507 015 03 zahnrad')[0],
+	VR.machine.findAll('4507 016 03 Zahnrad f. Getr. KV-120')[0]]
+	for g in gears:
+		if g.getEntity():
+			a = g.getEntity().getVector('axis')
+			if a:
+				p = g.getPose()
+				p.setPos([0,0,0])
+				a = p.mult(a)
+				g.rotate(-speed,a)
+				
+	if hasattr(VR, 'mechanismSim'):
+		VR.mechanismSim.update()
+		VR.mechanismSim.updateVisuals()
+		
+</core>
+      <trig type="on_timeout" dev="" state="Pressed" param="0" key="0" base_name="trigger" name_space="__global__" name_suffix="3" persistency="666"/>
+      <trig type="on_device" dev="keyboard" state="Pressed" param="" key="32" base_name="trigger" name_space="__global__" name_suffix="17" persistency="666"/>
+    </Script>
+    <Script base_name="simLAD" group="simulation" name_space="__script__" name_suffix="0" persistency="666" server="server1" type="Python">
+      <core>
+	import VR
+
+	if not hasattr(VR, 'compileUnits'): return
+	
+	def getOutParts(wire):
+		res = []
+		for ID in wire.outputs:
+			if ID in wire.cu.parts: res.append(wire.cu.parts[ID])
+		return res
+		
+	def getOutWires(part):
+		res = []
+		for ID in part.outputs:
+			if ID in part.cu.wires: res.append(part.cu.wires[ID])
+		return res
+		
+	def getPowerWires(cu):
+		return [ cu.wires[wireID] for wireID in cu.poweredWireIDs if wireID in cu.wires ]
+	
+	def printStack(stack):
+		print len(stack), [ (c.name,c.lastComputationResult) for c in stack ]
+	
+	def getNextParts(wires):
+		res = []
+		for wire in wires: res += getOutParts(wire)
+		return res
+		
+	def getNextWires(parts):
+		res = []
+		for part in parts: res += getOutWires(part)
+		return res
+	
+	def cleanStack(stack):
+		stack2 = []
+		for item in reversed(stack):
+			if not item in stack2: 
+				stack2 = [item]+stack2
+		return stack2
+	
+	def getCompileUnitEvalStack(cu):
+		nextWires = getPowerWires(cu)
+		stack = nextWires
+		
+		while len(nextWires):
+			nextParts = getNextParts(nextWires)
+			nextWires = getNextWires(nextParts)
+			stack += nextParts + nextWires
+		
+		return cleanStack(stack)	
+		
+	def computeWire(wire):
+		if wire.powerrail:
+			wire.lastComputationResult = 1
+			return
+			
+		Imax = 0
+		for ID in wire.inputs:
+			if ID in wire.cu.parts: 
+				part = wire.cu.parts[ID]
+				Imax = max(Imax,part.lastComputationResult)
+		wire.lastComputationResult = Imax
+		
+	def computePart(part):
+		Imax = 0
+		for ID in part.inputs:
+			if ID in part.cu.wires: 
+				wire = part.cu.wires[ID]
+				Imax = max(Imax,wire.lastComputationResult)
+		if part.isOperand(): Imax = part.computeOperandOutput(Imax)
+		if part.isBlock(): Imax = part.computeBlockOutput(Imax)
+		part.lastComputationResult = Imax
+		
+	for ID, cu in VR.compileUnits.items():
+		stack = getCompileUnitEvalStack(cu)
+		for item in stack:
+			if item.name == 'wire': computeWire(item)
+			else: computePart(item)
+				
+</core>
+      <trig type="on_timeout" dev="" state="Pressed" param="0" key="0" base_name="trigger" name_space="__global__" name_suffix="7" persistency="666"/>
+    </Script>
+    <Script base_name="site" group="deprecated" name_space="__script__" name_suffix="0" persistency="666" server="server1" type="HTML">
+      <core>
+&lt;!DOCTYPE html&gt;
+&lt;html&gt;
+
+&lt;head&gt;
+
+	&lt;link rel="stylesheet" type="text/css" href="uiCss"&gt;
+	&lt;script type="text/javascript" src="uiScript"&gt;&lt;/script&gt; 
+ &lt;style type="text/css"&gt;
+  body {font-size:200%;
+		text-align:center;
+		background:#ffffff;
+		color:#000000;
+		font-family:"Arial"}
+  button {font-size:75%;color:#000000;}
+  
+  input[type="number"] {
+	
+	width:75px;
+	height:50px;
+	font-size:75%;
+  
+  }
+  
+  select {
+  
+	width:500px;
+	font-size:75%;
+  
+  }
+  
+  
+  
+ &lt;/style&gt;
+ 
+ &lt;script type="text/javascript"&gt;
+	var websocket = new WebSocket('ws://localhost:5500');
+	
+	var coordinates = new Array();
+	
+	
+	function importDATA(){websocket.send('import DATA');};
+	function compute(){websocket.send('Compute Visualisation')}
+	function reload(){websocket.send('reload')}
+	
+	
+	
+	function getUnknown(){
+	
+		websocket.send('Get unknown Geometry');
+		websocket.onmessage = function(m) { if(m.data) addUnknown(m.data); };
+		function addUnknown(m){document.getElementById("ecad").innerHTML += '&lt;option&gt;' + m+'&lt;/option&gt;';};
+	
+	};
+	
+	
+	
+	
+	function selectGeometry(){
+	
+		websocket.send('Select Geometry');
+		websocket.onmessage = function(m) { if(m.data) addGeometry(m.data); };
+		function addGeometry(m){document.getElementById("mcad").innerHTML += '&lt;option&gt;' + m+'&lt;/option&gt;';};
+	
+	};
+	
+	
+	function map(){
+	
+		var mapped = new Array();
+		var a = document.getElementById('ecad');
+		var b = document.getElementById('mcad');
+	
+		var str1 = a.options[a.selectedIndex].value;
+		var str2 = b.options[b.selectedIndex].value;
+	
+		mapped.push(str1);
+		mapped.push(str2);
+		s = mapped.join(":");
+	
+		websocket.send(s);
+	
+		var select1 = document.getElementById("mcad");
+		var select2 = document.getElementById("ecad");
+		var length1 = select1.options.length;
+		var length2 = select2.options.length;
+		for (i = 0; i &lt; length1; i++) {
+		  select1.options[i] = null;
+		}
+	
+		for (i = 0; i &lt; length2; i++) {
+		  select2.options[i] = null;
+		}
+	
+	
+	
+	};
+	
+	
+	function getWithout(){
+	
+		websocket.send('Get ECAD without Geometry');
+		websocket.onmessage = function(m) { if(m.data) addWithout(m.data); };
+		function addWithout(m){document.getElementById("noneMCAD").innerHTML += '&lt;option&gt;' + m+'&lt;/option&gt;';};
+	
+	
+	
+	};
+	
+	
+	function generateGeometry(){
+	
+		var e = document.getElementById('noneMCAD');
+		var str = e.options[e.selectedIndex].value;
+		websocket.send(str);
+		websocket.onmessage = function(m) { if(m.data) addWithout(m.data); };
+	
+	
+	};
+
+
+	function submit() {
+	
+	
+		if (typeof document.getElementById("x_coordinate").innerHTML != "undefined") {
+	
+	
+			coordinates.push(document.getElementById("x_coordinate").value);
+			document.getElementById("x_coordinate").value='';
+	
+				};
+			
+		if (typeof document.getElementById("y_coordinate").innerHTML != "undefined") {
+	
+	
+			coordinates.push(document.getElementById("y_coordinate").value);
+			document.getElementById("y_coordinate").value='';
+	
+				};
+			
+		if (typeof document.getElementById("z_coordinate").innerHTML != "undefined") {
+	
+	
+			coordinates.push(document.getElementById("z_coordinate").value);
+			document.getElementById("z_coordinate").value='';
+	
+				};
+			
+			websocket.send(coordinates)
+			coordinates = []
+		
+	
+	};
+	
+		
+	
+	
+	
+
+	
+	
+ 
+	
+ 
+ &lt;/script&gt;
+  
+&lt;/head&gt;
+
+&lt;body&gt;
+
+
+	
+
+	
+
+	VR Setup:&lt;br&gt;&lt;br&gt;
+	
+	&lt;table&gt; 
+		&lt;tbody&gt;
+		
+&lt;tr&gt;		
+	&lt;td&gt;&lt;button id="import" onclick="importDATA()"&gt;import DATA&lt;/button&gt;&lt;/td&gt;
+&lt;/tr&gt;		
+	&lt;tr&gt;
+		&lt;td&gt;&lt;p&gt;&lt;button  onclick="getUnknown()"&gt;Get unknown Geometry&lt;/button&gt;&lt;/p&gt;&lt;/td&gt;
+		&lt;td&gt;&lt;select id="ecad" size="3"&gt;
+			
+			&lt;/select&gt;&lt;/td&gt;
+	&lt;/tr&gt;
+				
+	&lt;td&gt;&lt;button onclick="selectGeometry()" &gt;Select Geometry&lt;/button&gt;
+		&lt;td&gt;&lt;select id="mcad" size="3" &gt; &lt;/select&gt;&lt;p&gt;&lt;button onclick="map()"&gt;Map&lt;/button&gt;&lt;/p&gt;&lt;/td&gt;
+			
+		&lt;tr&gt;
+			&lt;td&gt;
+				&lt;p&gt;&lt;button onclick="getWithout()"&gt;Get without Geometry&lt;/button&gt;
+			&lt;/td&gt;
+			&lt;td&gt;
+				&lt;select id="noneMCAD" size="3" &gt; &lt;/select&gt;
+			&lt;/td&gt;
+		&lt;/tr&gt;	
+		&lt;tr&gt;
+			&lt;td&gt;
+				&lt;p&gt;&lt;button onclick="generateGeometry()" id="generate"&gt;Generate Geometry&lt;/button&gt;
+			&lt;/td&gt;
+			&lt;td&gt;
+				&lt;p&gt;&lt;input type="number" placeholder="x" id="x_coordinate"&gt; 
+				&lt;input type="number" placeholder="y" id="y_coordinate"&gt;
+				 &lt;input type="number" placeholder="z" id="z_coordinate"&gt;&lt;/p&gt;
+			&lt;/td&gt;
+			
+			&lt;td&gt;
+				&lt;p&gt;&lt;button onclick="submit()" id="submit"&gt;save&lt;/button&gt;
+			&lt;/td&gt;
+			
+		&lt;/tr&gt;
+		
+		&lt;tr&gt;
+			&lt;td&gt;
+				&lt;button onclick="compute()""&gt;Compute Visualisation&lt;/button&gt;
+				
+			&lt;/td&gt;
+			&lt;td&gt;
+			
+				&lt;button onclick="reload()"&gt;Reload Project&lt;/button&gt;
+				
+			&lt;/td&gt;
+				
+		&lt;/tr&gt;	
+		
+		
+				
+		&lt;/tbody&gt;
+		
+	&lt;/table&gt;
+		
+		
+
+	
+&lt;/body&gt;
+
+&lt;/html&gt;
+</core>
+    </Script>
+    <Script base_name="statistics" group="tests" name_space="__script__" name_suffix="0" persistency="666" server="server1" type="Python">
+      <core>
+	import VR
+	
+	Nnone = 0
+	Necad = 0
+	Nmcad = 0
+	Nboth = 0
+	Nname = 0
+	NmcadNname = 0
+	NomcadID = 0
+	
+	
+	for vrID, component in VR.components.items():
+		if component.ecadID: Necad += 1
+		if component.mcadID: Nmcad += 1
+		if component.mcadID and component.ecadID: Nboth += 1
+		if not component.mcadID and not component.ecadID: Nnone += 1
+		if not component.name: Nname += 1
+		if not component.name and not component.mcadID: NmcadNname += 1
+		if not component.mcadID: 
+			NomcadID += 1
+			print component
+	
+		
+	print 'Number of components:', len(VR.components)
+	print 'Number of ecad components:', Necad
+	print 'Number of mcad components:', Nmcad
+	print 'Number of components in ecad and mcad:', Nboth
+	print 'Number of components without any ID:', Nnone
+	print 'Number of components without name:', Nname
+	print 'Number of components without name and mcad:', NmcadNname
+	print 'Number of components without mcadID:',NomcadID
+</core>
+    </Script>
+    <Script base_name="test" group="kinematics" name_space="__script__" name_suffix="0" persistency="666" server="server1" type="Python">
+      <core>
+	import VR
+
+	g = VR.motorGear
+	print g.getWorldScale()
+	
+	for a in [g] + g.getAncestry():
+		if a.hasTag('transform'): 
+			print a.getScale(), a.getName()
+</core>
+    </Script>
+    <Script base_name="testGears" group="kinematics" name_space="__script__" name_suffix="0" persistency="666" server="server1" type="Python">
+      <core>
+	import VR
+	return
+
+	for e in VR.onto.getEntities('Gear'):
+		g = e.getSGObject()
+		a = e.getVector('axis')
+		if a:
+			p = g.getPose()
+			p.setPos([0,0,0])
+			a = p.mult(a)
+			g.rotate(0.01,a)
+</core>
+      <trig type="on_timeout" dev="" state="Pressed" param="0" key="0" base_name="trigger" name_space="__global__" name_suffix="10" persistency="666"/>
+    </Script>
+    <Script base_name="testKinematicChain" group="deprecated" name_space="__script__" name_suffix="0" persistency="666" server="server1" type="Python">
+      <core>
+	import VR
+	
+	gears = VR.onto.getEntities('Gear')
+</core>
+    </Script>
+    <Script base_name="testPCA" group="deprecated" name_space="__script__" name_suffix="0" persistency="666" server="server1" type="Python">
+      <core>
+	import VR
+	
+	z = VR.machine.findAll('4507 016 03 Zahnrad f. Getr. KV-120')[0]
+	z.setPickable(True)
+	
+	s = VR.Selector()
+	s.select(z, 1, 0)
+	
+	pca = s.getSelection().computePCA()
+	
+	k = 0.032
+	print pca.pos(), pca.dir(), pca.x(), pca.up()
+	a = pca.pos()[0]*k
+	b = pca.pos()[1]*k
+	c = pca.pos()[2]*k
+	e1 = pca.dir()
+	e2 = pca.x()
+	e3 = pca.up()
+	
+	def P(i,j,k):
+		return e1*i*a + e2*j*b + e3*k*c
+	
+	if hasattr(VR, 'pcaBox'): VR.pcaBox.destroy()
+	box = VR.Geometry('box')
+	box.setPositions([P(-1,-1,1), P(1,-1,1), P(1,-1,-1), P(-1,-1,-1), P(-1,1,1), P(1,1,1), P(1,1,-1), P(-1,1,-1)])
+	box.addQuad([0,1,2,3])
+	box.addQuad([4,5,6,7])
+	box.addQuad([0,3,7,4])
+	box.addQuad([1,2,6,5])
+	box.updateNormals(True)
+	z.addChild(box)
+	VR.pcaBox = box
+</core>
+    </Script>
+  </Scripts>
+  <Sockets persistency="666"/>
+  <Background color="0.370962 0.370962 0.370962" format=".png" path="" persistency="666" type="0"/>
+  <Navigation active="Orbit" persistency="666"/>
+  <Materials persistency="666"/>
+  <Semantics persistency="666"/>
+</Scene>

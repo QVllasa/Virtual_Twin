@@ -1,0 +1,501 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Scene base_name="testGear" name_space="Scene" name_suffix="0" persistency="666">
+  <Objects>
+    <Object base_name="Root" name_space="__global__" name_suffix="0" persistency="666" pickable="0" type="Object" visible="4294967295">
+      <Object ambient="0.3 0.3 0.3 1" base_name="light" beacon="Headlight_beacon" diffuse="1 1 1 1" lightType="point" name_space="__global__" name_suffix="0" on="1" persistency="666" photometricMap="" pickable="0" shadow="0" shadowColor="0.1 0.1 0.1 1" shadowMapRes="2048" shadowVolume="1e+06 1e+06 1e+06 -1e+06 -1e+06 -1e+06 1" specular="0.1 0.1 0.1 1" type="Light" visible="4294967295">
+        <Object accept_root="1" aspect="1" at="0.0214091 0.867989 -0.0328774" at_dir="0" base_name="Default" far="512" fov="1.0472" from="1.03701 2.8567 -11.8054" name_space="__global__" name_suffix="0" near="0.1" orthoSize="100" persistency="666" pickable="0" scale="1 1 1" type="Camera" up="0 1 0" visible="4294967295">
+          <Object at="0 0 -1" at_dir="0" base_name="Headlight_beacon" from="0 0 0" light="light" name_space="__global__" name_suffix="0" persistency="666" pickable="0" scale="1 1 1" type="LightBeacon" up="0 1 0" visible="4294967295">
+            <constraint persistency="666"/>
+          </Object>
+          <constraint persistency="666"/>
+        </Object>
+      </Object>
+    </Object>
+  </Objects>
+  <Cameras activeCam="Default" persistency="666"/>
+  <Rendering deferred_rendering="0" fogColor="0.5 0.5 0.5 1" fogParams="0 0 100 0.1" frustum_culling="1" fxaa="0" hmdd="0" marker="0" occlusion_culling="0" persistency="666" ssao="0" ssao_kernel="4" ssao_noise="4" ssao_radius="0.02" two_sided="1"/>
+  <Scripts persistency="666">
+    <Script base_name="KinematicSolver" group="no group" name_space="__script__" name_suffix="0" persistency="666" server="server1" type="Python">
+      <core>
+	import VR
+	
+	
+	class Part:
+		def __init__(self, ID, obj):
+			self.ID = ID
+			self.obj = obj
+			self.joints = []
+			
+		#bool dynamic 	
+		def physicalize(self, dynamic):
+			ld = 1
+			ad = 5
+			self.obj.setDamping(ld,ad)
+			self.obj.setGravity([0,0,0])
+			self.obj.physicalize(True, dynamic, 'Convex')
+			
+	
+	class Joint:
+		def __init__(self, ID, pID1, pID2, constraint):
+			self.ID = ID
+			self.constraint = constraint
+			self.p1 = pID1
+			self.p2 = pID2
+
+			
+	class KinematikSolver:
+		def __init__(self):
+			self.graph = VR.Graph()
+			self.graph.clear()
+			self.mechanism = VR.Mechanism()
+			self.parts = {}
+			self.joints = {}
+			self.lastFrame = 0
+		
+		#TODO evtl ändern: Parts sollen Kanten &amp; Joints Knoten sein
+		
+		def initInternal(self):
+			for p in self.parts:
+				self.parts[p].physicalize(True)
+			
+		def addPart(self, obj):
+			nID = self.graph.addNode()
+			part = Part(nID, obj)
+			self.parts[part.ID] = part
+			return part
+			
+		def addPrimitive(self, name, parent, params, pose):
+			p = VR.Geometry(name)
+			p.setPrimitive(params)
+			p.setPose(pose)
+			#p.getConstraint().setReference(p.getPose())
+			parent.addChild(p)
+			part = VR.kinematics.addPart(p)
+			return part
+		
+			
+		def addJoint(self, pID1, pID2, constraint):
+			eID = self.graph.connect(pID1, pID2)
+			joint = Joint(eID, pID1, pID2, constraint)
+			self.joints[joint.ID] = joint
+			self.parts[pID1].joints.append(joint.ID)
+			self.parts[pID2].joints.append(joint.ID)
+			return joint
+			
+		# p1, p2 Part	
+		# d1, d2 VR.Pose (Offset)	
+		# axis is 3,4 or 5 [x,y or z]	
+		# minRange, maxRange float
+		def setupHinge(self, p1, p2, d1, d2, axis, minRange, maxRange):
+			c = VR.Constraint()
+			c.constrain(axis, minRange, maxRange)
+			c.setOffsetA(d1)
+			c.setOffsetB(d2)
+			cs = VR.Constraint()
+			p1.obj.attach(p2.obj, c, cs)
+			return VR.kinematics.addJoint(p1.ID, p2.ID, c)
+		
+		# p1, p2 Part	
+		# d1, d2 VR.Pose (Offset)
+		def setupBallJoint(self, p1, p2, d1, d2):
+			c = VR.Constraint()
+			c.free([3,4,5])
+			c.setOffsetA(d1)
+			c.setOffsetB(d2)			
+			cs = VR.Constraint()
+			p1.obj.attach(p2.obj, c, cs)
+			return VR.kinematics.addJoint(p1.ID, p2.ID, c)
+			
+		def addGear(self, gear):
+			self.mechanism.addGear(gear)
+			
+		def getChangedObjects(self):
+			res = []
+			for i,part in self.parts.items():
+				if part.obj.changedSince(self.lastFrame):
+					res.append(part)
+			self.lastFrame = VR.getFrame()
+			return res
+			
+		def update(self):
+			# - check if any part moved
+			# - resolve cycles
+			
+			for part in self.getChangedObjects():
+				for joint in part.joints:
+					pass
+			
+			self.mechanism.update() # call last
+				
+		def printGraph(self):
+			print 'Nodes: ', self.graph.getNodes()
+			print 'Edges: ', self.graph.getEdges()	
+			
+			
+	return KinematikSolver()
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+</core>
+    </Script>
+    <Script base_name="bulletTest" group="no group" name_space="__script__" name_suffix="0" persistency="666" server="server1" type="Python">
+      <core>
+	import VR
+
+	VR.setPhysicsActive(0)
+	
+	if hasattr(VR, 'scene'): VR.scene.destroy()
+	VR.scene = VR.Object('scene', 'light')
+	VR.scene.clearChildren()
+	
+	def addPrimitive(name, parent, params, pose):
+		p = VR.Geometry(name)
+		p.setPrimitive(params)
+		p.setPose(pose)
+		p.setPickable(True)
+		#p.getConstraint().setReference(p.getPose())
+		parent.addChild(p)
+		return p
+		
+	
+	p1 = addPrimitive('cylinder', VR.scene, 'Cylinder 0.4 0.04 32 1 1 1', VR.Pose([0,1,0],[0,0,-1],[0,1,0]))
+	p2 = addPrimitive('cylinder', VR.scene, 'Cylinder 0.4 0.03 32 1 1 1', VR.Pose([0,-1,0],[0,0,-1],[0,1,0]))
+	
+		
+	
+	ld = 1
+	ad = 1
+	p1.setDamping(ld,ad)
+	p2.setDamping(ld,ad)
+	p1.setGravity([0,0,0])
+	p2.setGravity([0,0,0])
+	
+	p1.physicalize(True, False, 'Convex')
+	p2.physicalize(True, True, 'Convex')
+
+	c = VR.Constraint()
+	c.free([4,5])
+	c.setOffsetA(VR.Pose([0,-0.2,0],[0,0,-1],[0,1,0]))
+	c.setOffsetB(VR.Pose([0,0.2,0],[0,0,-1],[0,1,0]))
+	cs = VR.Constraint()
+	p1.attach(p2,c,cs)
+	
+	VR.setPhysicsActive(1)
+</core>
+    </Script>
+    <Script base_name="bulletTest2" group="no group" name_space="__script__" name_suffix="0" persistency="666" server="server1" type="Python">
+      <core>
+	import VR
+
+	VR.setPhysicsActive(0)
+	
+	if hasattr(VR, 'scene'): VR.scene.destroy()
+	VR.scene = VR.Object('scene', 'light')
+	VR.scene.clearChildren()
+	
+	a = VR.Geometry("anchor")
+	a.setPrimitive('Cylinder 0.4 0.04 16 1 1 1')
+	a.setPose(VR.Pose([0,1,0], [0,0,-1], [0,1,0]))
+	a.setPickable(True)
+	VR.scene.addChild(a)
+	
+	b = VR.Geometry('b')
+	b.setPrimitive('Cylinder 0.4 0.03 16 1 1 1')
+	b.setPose(VR.Pose([0,-1,0], [0,0,-1], [0,1,0]))
+	b.setPickable(True)
+	VR.scene.addChild(b)
+	
+	ld = 10
+	ad = 50
+	a.setDamping(ld,ad)
+	b.setDamping(ld,ad)
+	a.setGravity([0,0,0])
+	b.setGravity([0,0,0])
+	
+	
+	a.physicalize(True, False, 'Convex')
+	b.physicalize(True, True, 'Convex')
+	
+	c = VR.Constraint()
+	c.free([3,4,5])
+	c.setOffsetA(VR.Pose([0,-0.2,0],[0,0,-1],[0,1,0]))
+	c.setOffsetB(VR.Pose([0,0.2,0],[0,0,-1],[0,1,0]))
+	cs = VR.Constraint()
+	a.attach(b, c, cs)
+	
+	VR.setPhysicsActive(1)
+	
+	
+	
+	
+	
+</core>
+    </Script>
+    <Script base_name="constructJointModels" group="no group" name_space="__script__" name_suffix="0" persistency="666" server="server1" type="Python">
+      <core>
+	import VR
+	
+	VR.scene.clearChildren()
+	withConstraints = False
+
+	def addPrimitive(name, parent, params, pose):
+		p = VR.Geometry(name)
+		p.setPrimitive(params)
+		p.setPose(pose)
+		p.setPickable(True)
+		p.getConstraint().setReference(p.getPose())
+		parent.addChild(p)
+		VR.parts.append(p)
+		return p
+		
+	def addCSG(name, obj1, obj2, operation):
+		csg = VR.CSGGeometry(name)
+		csg.addChild(obj1)
+		csg.addChild(obj2)
+		csg.setOperation(operation)
+		csg.setEditMode(0)
+		csg.setPickable(True)
+		csg.getConstraint().setReference(csg.getPose())
+		VR.scene.addChild(csg)
+		return csg
+		
+	# - build all cases
+	#  - 6DoF joints 
+	#   - fixed joint X
+	#   - ball joint X
+	#   - hinge joint X
+	#   - linear joint
+	#  - mechanics
+	#   - gear gear X
+	#   - gear axle (fixed constraint)
+	#   - gear chain 
+	#   - gear thread
+	#  - long chains
+	#  - closed chain
+	#  - graph with cylces
+		
+	#hinge joint
+	c4 = addPrimitive('cylinder', VR.scene, 'Cylinder 2.8 0.2 32 1 1 1', VR.Pose([0,5,0],[0,0,-1],[1,0,0]))
+	c5 = addPrimitive('cylinder', VR.scene, 'Cylinder 2.8 0.2 32 1 1 1', VR.Pose([0,5,0],[0,0,-1],[1,0,0]))
+	c4.getConstraint().setOffsetB(VR.Pose([0,1.4,0],[0,0,-1],[1,0,0]))
+	c4.getConstraint().lock([0,1,2,3,4])
+	c5.getConstraint().lock([0,1,2,3,4])
+	c5.getConstraint().setOffsetB(VR.Pose([0,-1.4,0],[0,0,-1],[1,0,0]))
+
+	
+	#ball joint
+	s1 = addPrimitive('sphere', VR.scene, 'Sphere 0.7 3', VR.Pose([0,0,0],[0,0,-1],[0,1,0]))
+	b1 = addPrimitive('box', VR.scene, 'Box 1.4 1.4 1.4', VR.Pose([0.7,0,0],[0,0,-1],[0,1,0]))
+	csg1 = addCSG('ballJoint', s1, b1, 'subtract')
+	
+	c1 = addPrimitive('cylinder', VR.scene, 'Cylinder 2.8 0.2 32 1 1 1', VR.Pose([-1.4,0,0],[0,0,-1],[1,0,0]))
+	csg2 = addCSG('blah', csg1, c1, 'unite')
+	
+	s2 = addPrimitive('sphere', VR.scene, 'Sphere 0.5 3', VR.Pose([0,0,0],[0,0,-1],[0,1,0]))
+	c2 = addPrimitive('cylinder', VR.scene, 'Cylinder 2.8 0.2 32 1 1 1', VR.Pose([1.4,0,0],[0,0,-1],[1,0,0]))
+	csg3 = addCSG('ballJoint2', s2, c2, 'unite')
+	
+	csg2.setFrom([0,5,5])
+	csg3.setFrom([0,5,5])
+	
+	csg2.getConstraint().lock([0,1,2])
+	csg3.getConstraint().lock([0,1,2])
+	csg2.getConstraint().setReference(csg2.getPose())
+	csg3.getConstraint().setReference(csg3.getPose())
+
+	#linear joint
+	c4 = addPrimitive('cylinder', VR.scene, 'Cylinder 2.8 0.3 32 1 1 1', VR.Pose([1.4,0,5],[0,0,-1],[1,0,0]))
+	c5 = addPrimitive('cylinder', VR.scene, 'Cylinder 3 0.2 32 1 1 1', VR.Pose([1.4,0,5],[0,0,-1],[1,0,0]))
+	csg4 = addCSG('linearJoint', c4, c5, 'subtract')
+	
+	c7 = addPrimitive('cylinder', VR.scene, 'Cylinder 3 0.2 32 1 1 1', VR.Pose([0,0,5],[0,0,-1],[1,0,0]))
+	
+	c7.getConstraint().lock([0,2,3,4,5])
+	csg4.getConstraint().lock([1,2,3,4,5])
+	c7.getConstraint().setReferential(csg4)
+	
+	#fixed joint
+	f1 = addPrimitive('box', VR.scene, 'Box 1 1 1', VR.Pose([0,0,0],[0,0,-1],[0,1,0]))
+	c6 = addPrimitive('cylinder', VR.scene, 'Cylinder 2.8 0.2 32 1 1 1', VR.Pose([0,0,0],[0,0,-1],[1,0,0]))
+	c6.getConstraint().setOffsetB(VR.Pose([0,1.4,0],[0,0,-1],[1,0,0]))
+	c6.getConstraint().lock([0,1,2,3,4])
+	c6.getConstraint().setReferential(f1)
+	
+	# gear axle
+	g3 = addPrimitive('gear', VR.scene, 'Gear 0.1 0.2 0.1 32 0.05 0', VR.Pose([0,0,0],[-1,0,0],[0,1,0]))
+	a1 = addPrimitive('cylinder', VR.scene, 'Cylinder 3 0.2 32 1 1 1', VR.Pose([0,5,10],[0,0,-1],[1,0,0]))
+
+	g3.rotate(1.6,[0,0,1])
+	g3.getConstraint().setReference(g3.getPose())
+	g3.getConstraint().lock([0,1,2,3,4])
+	a1.getConstraint().lock([0,1,2,3,5])
+	g3.getConstraint().setReferential(a1)
+	
+			
+	#gear gear
+	g1 = addPrimitive('gear', VR.scene, 'Gear 0.1 0.3 0.1 32 0.05 0', VR.Pose([0,0,10],[0,0,-1],[0,1,0]))
+	g2 = addPrimitive('gear', VR.scene, 'Gear 0.1 0.3 0.1 32 0.05 0', VR.Pose([1,0,10],[0,0,-1],[0,1,0]))
+	
+	g1.getConstraint().lock([0,1,2,3,4])
+	g2.getConstraint().lock([0,1,2,3,4])
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+</core>
+    </Script>
+    <Script base_name="constructKinChainModel" group="no group" name_space="__script__" name_suffix="0" persistency="666" server="server1" type="Python">
+      <core>
+	import VR
+	
+		
+	VR.setPhysicsActive(0)
+	VR.scene.clearChildren()
+	VR.kinematics.graph.clear()
+	
+	length = 2.4
+	#hinge joints
+	p1 = VR.kinematics.addPrimitive('cylinder', VR.scene, 'Cylinder '+ str(length)+' 0.2 32 1 1 1', VR.Pose([length,0,0],[0,0,-1],[1,0,0]))
+	p2 = VR.kinematics.addPrimitive('cylinder', VR.scene, 'Cylinder '+ str(length)+' 0.2 32 1 1 1', VR.Pose([0,0,0],[0,0,-1],[1,0,0]))
+	p3 = VR.kinematics.addPrimitive('cylinder', VR.scene, 'Cylinder '+ str(length)+' 0.2 32 1 1 1', VR.Pose([0-length,0,0],[0,0,-1],[1,0,0]))
+	p4 = VR.kinematics.addPrimitive('cylinder', VR.scene, 'Cylinder '+ str(length)+' 0.2 32 1 1 1', VR.Pose([0-2*length,0,0],[0,0,-1],[1,0,0]))
+	p4.obj.setPickable(True)
+	
+	VR.kinematics.initInternal() # temporary workaround	
+	p1.physicalize(False)
+	
+	
+	d1 = VR.Pose([0,-length/2,0],[0,0,-1],[0,1,0])
+	d2 = VR.Pose([0,length/2,0],[0,0,-1],[0,1,0])
+	
+	b1 = VR.kinematics.setupBallJoint(p1, p2, d1, d2)
+	b2 = VR.kinematics.setupBallJoint(p2, p3, d1, d2)
+	h1 = VR.kinematics.setupHinge(p3, p4, d1, d2, 5, 0.0, 0.7)
+
+	VR.kinematics.printGraph()
+		
+	VR.setPhysicsActive(1)
+
+	
+	
+</core>
+    </Script>
+    <Script base_name="init" group="no group" name_space="__script__" name_suffix="0" persistency="666" server="server1" type="Python">
+      <core>
+	import VR
+
+	if hasattr(VR, 'scene'): VR.scene.destroy()
+	VR.scene = VR.Object('scene', 'light')
+	
+	VR.kinematics = VR.KinematicSolver()
+	
+	VR.parts = []
+	#VR.constructJointModels()
+	
+	#VR.constructKinChainModel()
+	
+	#VR.initKinematics(None)
+</core>
+      <trig type="on_scene_load" dev="" state="Pressed" param="" key="0" base_name="trigger" name_space="__global__" name_suffix="3" persistency="666"/>
+    </Script>
+    <Script base_name="initKinematics" group="no group" name_space="__script__" name_suffix="0" persistency="666" server="server1" type="Python">
+      <core>
+	import VR
+	
+	print 'initKinematics'
+	
+	VR.kinematics = VR.KinematicSolver()
+	
+	for obj in VR.parts:
+		part = VR.kinematics.addPart(obj)
+		#obj.getConstraint().setActive(False) # kinematic solver takes over :D
+
+	
+</core>
+      <trig type="on_device" dev="keyboard" state="Pressed" param="" key="32" base_name="trigger" name_space="__global__" name_suffix="0" persistency="666"/>
+    </Script>
+    <Script base_name="testK" group="no group" name_space="__script__" name_suffix="0" persistency="666" server="server1" type="Python">
+      <core>
+	import VR
+
+	return
+
+	if hasattr(VR, 'lf'):
+		for i,o in VR.kinematics.parts.items():
+			if o.object.changedSince(VR.lf):
+				print 'object change detected:', o.object.getName(), 'at', VR.lf
+	VR.lf = VR.getFrame()
+</core>
+      <trig type="on_timeout" dev="" state="Pressed" param="0" key="0" base_name="trigger" name_space="__global__" name_suffix="1" persistency="666"/>
+    </Script>
+    <Script base_name="testPCA" group="no group" name_space="__script__" name_suffix="0" persistency="666" server="server1" type="Python">
+      <core>
+	import VR
+
+	if hasattr(VR, 'scene'): VR.scene.destroy()
+	VR.scene = VR.Object('scene', 'light')
+
+	gear = VR.Geometry('gear')
+	gear.setPrimitive('Gear 0.1 0.3 0.1 32 0.05 0')
+	VR.scene.addChild(gear)
+	gear.setPose(VR.Pose([1,2,3], [0,1,-1], [0,1,0]))
+	gear.applyTransformation()
+	
+	box = VR.Geometry('box')
+	box.setPrimitive('Box 0.1 0.2 0.3')
+	VR.scene.addChild(box)
+
+	
+	
+	selection = VR.Selection('blah')
+	#selection.add(gear)
+	selection.add(box)
+	testPose = selection.computePCA()
+	print selection, testPose.pos(), testPose.dir(), testPose.up()
+	
+	
+	box.setPose(testPose)
+</core>
+    </Script>
+    <Script base_name="updateKinematics" group="no group" name_space="__script__" name_suffix="0" persistency="666" server="server1" type="Python">
+      <core>
+	import VR
+	
+	if hasattr(VR, 'kinematics'): VR.kinematics.update()
+</core>
+      <trig type="on_timeout" dev="" state="Pressed" param="0" key="0" base_name="trigger" name_space="__global__" name_suffix="2" persistency="666"/>
+    </Script>
+  </Scripts>
+  <Sockets persistency="666"/>
+  <Background color="0.6 0.6 0.6" format=".png" path="" persistency="666" type="0"/>
+  <Navigation active="Orbit" persistency="666"/>
+  <Materials persistency="666"/>
+  <Semantics persistency="666"/>
+</Scene>
